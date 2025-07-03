@@ -1,0 +1,45 @@
+{
+  "name": "phienbanhoanchinh226",
+  "private": true,
+  "version": "0.0.0",
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@google/genai": "^0.11.0",
+    "antd": "^5.26.3",
+    "axios": "^1.10.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.8",
+    "electron": "^37.1.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
+  },
+  "build": {
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "dist"
+      }
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    }
+  }
+}
