@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Card, Button, Row, Col, message, Typography, Spin } from 'antd';
+import { Card, Button, Row, Col, Typography, Spin, Modal } from 'antd';
 import axios from 'axios';
+import QRCodeWrapper from './QRCodeWrapper';
 
 const API_BASE = "https://key-manager-backend.onrender.com/api";
 
@@ -14,6 +15,8 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
   const [credit, setCredit] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [paying, setPaying] = useState(false);
+  // State cho Modal custom
+  const [modal, setModal] = useState<{ open: boolean, title: string, content: React.ReactNode, onOk?: () => void }>({ open: false, title: '', content: '', onOk: undefined });
 
   // Lấy số credit hiện tại
   const fetchCredit = async () => {
@@ -23,7 +26,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       const res = await axios.post(`${API_BASE}/validate`, { key: currentKey });
       setCredit(res.data?.keyInfo?.credit ?? 0);
     } catch (err) {
-      message.error('Không lấy được số credit!');
+      setModal({ open: true, title: 'Lỗi', content: 'Không lấy được số credit!' });
     }
     setLoading(false);
   };
@@ -36,26 +39,61 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
   // Nạp credit
   const handleRecharge = async (creditAmount: number) => {
     if (!currentKey) {
-      message.error('Không tìm thấy key hiện tại!');
+      setModal({ open: true, title: 'Lỗi nạp credit', content: 'Không tìm thấy key hiện tại!' });
       return;
     }
     setPaying(true);
     try {
       const res = await axios.post(`${API_BASE}/payment/create`, { key: currentKey, credit: creditAmount });
       if (res.data?.payUrl) {
-        window.open(res.data.payUrl, '_blank');
-        message.info('Vui lòng quét QR và thanh toán. Sau khi thanh toán xong, bấm "Kiểm tra credit" để cập nhật.');
+        setModal({
+          open: true,
+          title: 'Quét QR để thanh toán',
+          content: (
+            <div style={{ textAlign: 'center' }}>
+              <QRCodeWrapper value={res.data.payUrl} size={200} />
+              <div style={{ marginTop: 16 }}>
+                <Button type="primary" onClick={() => window.open(res.data.payUrl, '_blank')}>
+                  Mở trang thanh toán
+                </Button>
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <b>Hướng dẫn:</b> Quét QR bằng app ngân hàng để thanh toán. Sau khi thanh toán xong, bấm <b>"Kiểm tra credit"</b> để cập nhật.<br />
+                Nếu có vấn đề, liên hệ admin để được hỗ trợ.
+              </div>
+            </div>
+          ),
+          onOk: undefined
+        });
       } else {
-        message.error('Không lấy được link thanh toán!');
+        setModal({ open: true, title: 'Lỗi nạp credit', content: 'Không lấy được link thanh toán!' });
+        await new Promise(r => setTimeout(r, 2000));
       }
     } catch (err) {
-      message.error('Lỗi tạo đơn thanh toán!');
+      const error: any = err;
+      let detail = error?.response?.data?.message || error?.message || 'Lỗi tạo đơn thanh toán!';
+      setModal({ open: true, title: 'Lỗi nạp credit', content: detail });
+      await new Promise(r => setTimeout(r, 2000));
     }
     setPaying(false);
   };
 
   return (
     <div style={{ maxWidth: 600, margin: '40px auto' }}>
+      {/* Modal custom */}
+      <Modal
+        open={modal.open}
+        title={modal.title}
+        onOk={() => {
+          setModal({ ...modal, open: false });
+          if (modal.onOk) modal.onOk();
+        }}
+        onCancel={() => setModal({ ...modal, open: false })}
+        okText="OK"
+        cancelText="Đóng"
+      >
+        {modal.content}
+      </Modal>
       <Card title="Nạp Credit" bordered>
         <Typography.Paragraph>
           <b>Key hiện tại:</b> <span style={{ color: '#1677ff' }}>{currentKey || 'Chưa đăng nhập'}</span><br />
@@ -66,7 +104,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
           {PRICING.map((pkg, idx) => (
             <Col span={8} key={idx}>
               <Card
-                style={{ marginBottom: 16, textAlign: 'center' }}
+                style={{ marginBottom: 16, textAlign: 'center', opacity: paying ? 0.7 : 1 }}
                 bordered
                 title={pkg.label}
               >
@@ -74,15 +112,24 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
                 <Button
                   type="primary"
                   loading={paying}
+                  disabled={paying}
                   onClick={() => handleRecharge(pkg.credit)}
                   style={{ width: '100%' }}
                 >
-                  Nạp gói này
+                  {paying ? 'Đang xử lý...' : 'Nạp gói này'}
                 </Button>
               </Card>
             </Col>
           ))}
         </Row>
+        {paying && (
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <Spin size="large" />
+            <div style={{ marginTop: 8, color: '#1677ff' }}>
+              Đang tạo đơn thanh toán, vui lòng chờ...
+            </div>
+          </div>
+        )}
         <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>
           Sau khi thanh toán, vui lòng bấm <b>"Kiểm tra credit"</b> để cập nhật số credit mới.<br />
           Nếu có vấn đề, liên hệ admin để được hỗ trợ.

@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 export enum ActiveModule {
   SuperAgent = "super-agent",
   CreativeLab = "creative-lab",
@@ -25,6 +18,7 @@ export enum ActiveModule {
   Dream100CompetitorAnalysis = "dream-100-competitor-analysis", // Added
   CharacterStudio = "character-studio", // Added for Character Locking Prompts
   Support = "support", // Added
+  Recharge = "recharge", // Thêm dòng này
 }
 
 export interface ElevenLabsApiKey {
@@ -49,6 +43,7 @@ export type ApiProvider = "gemini" | "openai" | "grok" | "deepseek" | "minimax";
 export interface ApiSettings {
   provider: ApiProvider;
   apiKey: string;
+  apiBase: string;
 }
 
 export interface GeminiGenerateTextResponse {

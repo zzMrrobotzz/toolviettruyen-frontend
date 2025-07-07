@@ -1,14 +1,16 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActiveModule } from '../types';
 import { NAVIGATION_ITEMS } from '../constants';
+import axios from 'axios';
 
 interface SidebarProps {
   activeModule: ActiveModule;
   setActiveModule: (module: ActiveModule) => void;
+  apiSettings: { apiBase: string };
+  currentKey: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, apiSettings, currentKey }) => {
   return (
     <aside className="w-64 bg-gray-800 text-gray-300 p-5 flex flex-col h-screen fixed top-0 left-0 overflow-y-auto">
       <div className="text-center mb-8">
@@ -39,7 +41,49 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule }) => {
           </button>
         ))}
       </nav>
+      {/* CreditBox hiển thị ngay dưới menu */}
+      <CreditBox apiSettings={apiSettings} currentKey={currentKey} />
     </aside>
+  );
+};
+
+// CreditBox component
+const CreditBox: React.FC<{ apiSettings: { apiBase: string }, currentKey: string }> = ({ apiSettings, currentKey }) => {
+  const [credit, setCredit] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCredit = async () => {
+    if (!currentKey) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.post(`${apiSettings.apiBase}/validate`, { key: currentKey });
+      setCredit(res.data?.keyInfo?.credit ?? 0);
+    } catch (err) {
+      setError('Lỗi!');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchCredit();
+    // eslint-disable-next-line
+  }, [currentKey]);
+
+  return (
+    <div style={{ margin: '24px 0 0 0', padding: 12, borderRadius: 10, background: 'linear-gradient(90deg, #43e97b 0%, #38f9d7 100%)', textAlign: 'center', boxShadow: '0 2px 8px #0001' }}>
+      <div style={{ color: '#fff', fontWeight: 600, fontSize: 15, marginBottom: 2 }}>💳 Credit còn lại</div>
+      <div style={{ color: '#fff', fontSize: 24, fontWeight: 700, marginBottom: 2 }}>{loading ? '...' : (credit !== null ? credit : '?')}</div>
+      {error && <div style={{ color: '#ffd6d6', fontSize: 12 }}>{error}</div>}
+      <button
+        onClick={fetchCredit}
+        style={{ marginTop: 4, padding: '2px 10px', borderRadius: 6, border: 'none', background: '#fff', color: '#1e90ff', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
+        disabled={loading}
+      >
+        Làm mới
+      </button>
+    </div>
   );
 };
 

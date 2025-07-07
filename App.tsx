@@ -12,7 +12,7 @@ import {
   NicheThemeExplorerModuleState, NicheThemeAnalysisResult, // Added for Niche Theme Explorer
   Dream100CompetitorAnalysisModuleState, Dream100ChannelResult, GroundingChunk, // Added for Dream 100
   CharacterStudioModuleState, // Added for Character Studio
-  GeminiSubPromptsResponse // Added for ImageGenerationSuite
+  GeminiSubPromptsResponse, // Added for ImageGenerationSuite
   // SupportModuleState is not strictly needed for a static display, but can be added if it evolves
 } from './types';
 import { 
@@ -45,6 +45,7 @@ import NicheThemeExplorerModule from './components/modules/NicheThemeExplorerMod
 import Dream100CompetitorAnalysisModule from './components/modules/Dream100CompetitorAnalysisModule'; // Added
 import CharacterStudioModule from './components/modules/CharacterStudioModule'; // Added
 import SupportModule from './components/modules/SupportModule'; // Added
+import RechargeModule from './components/modules/RechargeModule'; // Đã thêm đúng
 import axios from "axios";
 
 // Địa chỉ backend API
@@ -925,6 +926,8 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.Support: 
         return <SupportModule />;
+      case ActiveModule.Recharge:
+        return <RechargeModule currentKey={key} />;
       default:
         return <div className="p-6 text-center text-gray-600">Chọn một module từ thanh bên để bắt đầu.</div>;
     }

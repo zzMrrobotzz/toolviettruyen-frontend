@@ -1,9 +1,3 @@
-
-
-
-
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
     ApiSettings, 
@@ -19,19 +13,26 @@ import InfoBox from '../InfoBox';
 import { generateText as generateGeminiText } from '../../services/geminiService';
 import { generateText as generateDeepSeekText } from '../../services/deepseekService';
 import { delay } from '../../utils';
+import axios from 'axios';
+import { Card, Spin } from 'antd';
+import CreditAlertBox from '../CreditAlertBox';
 
 interface BatchRewriteModuleProps {
   apiSettings: ApiSettings;
   moduleState: BatchRewriteModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<BatchRewriteModuleState>>;
+  currentKey: string;
 }
 
-const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
+const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, moduleState, setModuleState, currentKey }) => {
   const {
     inputItems, results, globalRewriteLevel, globalSourceLanguage, globalTargetLanguage,
     globalRewriteStyle, globalCustomRewriteStyle, globalAdaptContext,
     isProcessingBatch, batchProgressMessage, batchError, concurrencyLimit
   } = moduleState;
+
+  const [credit, setCredit] = useState<number | null>(null);
+  const [loadingCredit, setLoadingCredit] = useState(false);
 
   const updateState = (updates: Partial<BatchRewriteModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
@@ -125,7 +126,10 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
 
       let rewriteStyleInstructionPromptSegment = '';
       if (currentRewriteStyleSettingValue === 'custom') {
-        rewriteStyleInstructionPromptSegment = `Apply the following custom rewrite instructions: "${userProvidedCustomInstructions}". These instructions define THE SPECIFIC MANNER AND STYLE of rewriting, and they MUST be followed within the bounds and permissions set by the 'Degree of Change Required' (${currentRewriteLevel}%). The Degree of Change dictates WHAT can be changed, and your custom instructions dictate HOW it's changed.`;
+        rewriteStyleInstructionPromptSegment = `Apply the following custom rewrite instructions. These instructions are PARAMOUNT and OVERRIDE the general rules of the 'Degree of Change Required' when there is a direct conflict.
+ - For example, if the 'Degree of Change' for 50% says 'keep main character names', but your custom instruction says 'change the main character's name to Dra. Carmen Valdés', you MUST change the name to 'Dra. Carmen Valdés'.
+ - Similarly, if the text mentions '20 years of experience' and your custom instruction is to maintain persona details, you MUST keep '20 years of experience' unless explicitly told to change it.
+Your Custom Instructions: "${userProvidedCustomInstructions}"`;
       } else {
         rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${currentRewriteStyleSettingValue}.`;
       }
@@ -158,6 +162,7 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
       \n- **Timestamp Handling:** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
       ${localizationRequest}
       \n- **Overall Story Coherence (CRITICAL - Builds on Narrative Integrity):**
+          \n  - **Persona Consistency:** Pay close attention to key details that define a character's persona, such as their stated years of experience, specific titles (Dr., Prof.), or recurring personal details. These details MUST be maintained with 100% consistency throughout the entire rewritten text, unless a custom instruction explicitly directs you to change them.
           \n  - **Logical Flow:** The rewritten chunk MUST maintain logical consistency internally and with \`fullRewrittenStory\`.
           \n  - **Character Consistency (General Behavior & Names):** ${characterConsistencyInstructions}
           \n  - **Event, Setting & Situation Coherence:** Ensure events, locations, and plot-relevant objects are plausible and consistent with established facts (from \`fullRewrittenStory\` and the original chunk's premise), respecting the "Degree of Change". Once a setting or event detail is established in the rewrite, stick to it.
@@ -491,7 +496,7 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
             }));
             return;
         }
-        effectiveRewriteStyleForPrompt = effectiveCustomRewriteStyle.trim(); // The custom text itself is the style
+        effectiveRewriteStyleForPrompt = 'custom';
     } else {
         const selectedStyleOption = REWRITE_STYLE_OPTIONS.find(opt => opt.value === effectiveRewriteStyleValue);
         effectiveRewriteStyleForPrompt = selectedStyleOption ? selectedStyleOption.label : effectiveRewriteStyleValue;
@@ -554,6 +559,30 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     const key = Math.round(globalRewriteLevel / 25) * 25;
     return userLevelDescriptions[key] || "Di chuyển thanh trượt để xem mô tả.";
   }
+
+  const fetchCredit = async () => {
+    if (!currentKey) return;
+    setLoadingCredit(true);
+    try {
+      const res = await axios.post(`${apiSettings.apiBase}/validate`, { key: currentKey });
+      if (res.data?.keyInfo?.credit !== undefined) {
+        setCredit(res.data.keyInfo.credit);
+      }
+    } catch (err) {
+      setCredit(null);
+    }
+    setLoadingCredit(false);
+  };
+
+  useEffect(() => {
+    fetchCredit();
+    // eslint-disable-next-line
+  }, [apiSettings.apiKey]);
+
+  useEffect(() => {
+    if (!moduleState.isProcessingBatch) fetchCredit();
+    // eslint-disable-next-line
+  }, [moduleState.isProcessingBatch]);
 
   return (
     <ModuleContainer title="🔀 Viết Lại Hàng Loạt">
@@ -696,6 +725,7 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
       <button onClick={handleStartBatchRewrite} disabled={isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.originalText.trim())} className="w-full bg-gradient-to-r from-indigo-700 to-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg">
         🚀 Bắt Đầu Viết Lại Hàng Loạt ({inputItems.filter(it => it.originalText.trim()).length} mục)
       </button>
+      <CreditAlertBox credit={credit} loadingCredit={loadingCredit} />
 
       {isProcessingBatch && batchProgressMessage && <LoadingSpinner message={batchProgressMessage} />}
       {!isProcessingBatch && batchProgressMessage && <p className={`text-center font-semibold my-3 ${batchProgressMessage.includes("Hoàn thành") ? 'text-green-600' : 'text-indigo-600'}`}>{batchProgressMessage}</p>}

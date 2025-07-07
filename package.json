@@ -1,7 +1,9 @@
 {
   "name": "phienbanhoanchinh226",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "AI Story Writing Tool - Công cụ viết truyện AI",
+  "author": "Your Name",
   "main": "main.js",
   "scripts": {
     "dev": "vite",
@@ -26,6 +28,8 @@
     "vite": "^6.2.0"
   },
   "build": {
+    "appId": "com.yourcompany.phienbanhoanchinh226",
+    "productName": "AI Story Writing Tool",
     "files": [
       "dist/**/*",
       "main.js",
@@ -40,6 +44,20 @@
     "directories": {
       "buildResources": "assets",
       "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }

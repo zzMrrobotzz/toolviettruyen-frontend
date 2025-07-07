@@ -1,6 +1,4 @@
-
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     ApiSettings, 
     BatchStoryWritingModuleState, 
@@ -20,21 +18,27 @@ import InfoBox from '../InfoBox';
 import { generateText as generateGeminiText, generateTextWithJsonOutput as generateGeminiJson } from '../../services/geminiService';
 import { generateText as generateDeepSeekText, generateTextWithJsonOutput as generateDeepSeekJson } from '../../services/deepseekService';
 import { delay } from '../../utils';
+import axios from 'axios';
+import CreditAlertBox from '../CreditAlertBox';
 
 interface BatchStoryWritingModuleProps {
   apiSettings: ApiSettings;
   moduleState: BatchStoryWritingModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<BatchStoryWritingModuleState>>;
+  currentKey: string;
 }
 
 const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({ 
-    apiSettings, moduleState, setModuleState 
+    apiSettings, moduleState, setModuleState, currentKey 
 }) => {
   const {
     inputItems, results, globalTargetLength, globalWritingStyle, globalCustomWritingStyle,
     outputLanguage, referenceViralStoryForStyle, isProcessingBatch,
     batchProgressMessage, batchError, concurrencyLimit
   } = moduleState;
+
+  const [credit, setCredit] = useState<number | null>(null);
+  const [loadingCredit, setLoadingCredit] = useState(false);
 
   const updateState = (updates: Partial<BatchStoryWritingModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
@@ -227,6 +231,18 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     
     const analysisResult = await jsonGenerator<EditStoryAnalysisReport>(analysisPrompt);
 
+    try {
+      await axios.post(`${apiSettings.apiBase}/keys/use-credit`, { key: currentKey });
+      // Sau khi trừ credit, gọi lại API /validate để lấy số credit mới nhất
+      const res = await axios.post(`${apiSettings.apiBase}/validate`, { key: currentKey });
+      if (res.data?.keyInfo?.credit !== undefined) {
+        setCredit(res.data.keyInfo.credit);
+      }
+    } catch (err) {
+      alert('Hết credit hoặc lỗi khi trừ credit!');
+      throw err;
+    }
+
     return { 
         generatedStory: editedStory, 
         postEditAnalysis: analysisResult, 
@@ -237,6 +253,11 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
   };
 
   const handleStartBatchWriting = async () => {
+    if (isOutOfCredit) {
+      alert('Hết credit! Vui lòng nạp thêm để tiếp tục sử dụng chức năng này.');
+      return;
+    }
+
     const validItems = inputItems.filter(item => item.outline.trim() !== '');
     if (validItems.length === 0) {
       updateState({ batchError: 'Vui lòng thêm ít nhất một dàn ý hợp lệ.' });
@@ -323,11 +344,58 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     }
   };
 
+  // Định nghĩa fetchCredit trước renderCreditBox
+  const fetchCredit = async () => {
+    if (!currentKey) return;
+    try {
+      const res = await axios.post(`${apiSettings.apiBase}/validate`, { key: currentKey });
+      if (res.data?.keyInfo?.credit !== undefined) {
+        setCredit(res.data.keyInfo.credit);
+      }
+    } catch {
+      setCredit(null);
+    }
+  };
+  useEffect(() => { fetchCredit(); }, [currentKey, apiSettings.apiBase]);
+  const isOutOfCredit = credit !== null && credit <= 0;
+  const renderCreditBox = () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+      <div style={{ background: isOutOfCredit ? '#fff1f0' : '#e6fffb', color: isOutOfCredit ? '#ff4d4f' : '#1890ff', border: `1.5px solid ${isOutOfCredit ? '#ff4d4f' : '#1890ff'}`, borderRadius: 12, padding: '8px 20px', fontWeight: 600, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 20 }}>💳</span>
+        Credit còn lại: <span style={{ fontWeight: 700 }}>{credit !== null ? credit : '...'}</span>
+        <button onClick={fetchCredit} style={{ marginLeft: 12, background: '#fff', border: '1px solid #1890ff', color: '#1890ff', borderRadius: 6, padding: '2px 10px', fontWeight: 500, cursor: 'pointer' }}>Làm mới</button>
+      </div>
+    </div>
+  );
+
+  // Định nghĩa CreditAlertBox giống style module Viết Lại Hàng Loạt
+  const CreditAlertBox = () => (
+    <div style={{
+      background: '#f8fff3',
+      border: '2px solid #ff4d4f',
+      borderRadius: 12,
+      padding: '12px 32px',
+      color: '#ff4d4f',
+      fontWeight: 700,
+      fontSize: 22,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      margin: '18px auto 24px auto',
+      maxWidth: 340
+    }}>
+      <span style={{ fontSize: 28, marginRight: 10 }}>💳</span>
+      Credit còn lại: {credit !== null ? credit : '...'}
+    </div>
+  );
 
   return (
-    <ModuleContainer title="📚 Viết Truyện Hàng Loạt">
+    <ModuleContainer title="📝 Viết Truyện Hàng Loạt">
+      {/* Ô credit alert dưới tiêu đề */}
+      <CreditAlertBox />
+      {renderCreditBox()}
       <InfoBox>
-        <p><strong>💡 Hướng dẫn:</strong></p>
+        <p><strong>Hướng dẫn:</strong></p>
         <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-sm">
           <li>Thiết lập các tùy chọn chung như độ dài, phong cách viết, ngôn ngữ và truyện viral tham khảo (nếu có).</li>
           <li><strong>(Mới)</strong> Tùy chỉnh "Số luồng xử lý đồng thời" để tăng tốc độ. Mức khuyến nghị là 3 để đảm bảo ổn định.</li>
@@ -433,9 +501,19 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
       </div>
 
       {/* Action Button & Progress */}
-      <button onClick={handleStartBatchWriting} disabled={isProcessingBatch || inputItems.length === 0} className="w-full bg-gradient-to-r from-indigo-700 to-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg">
+      {isOutOfCredit && (
+        <div style={{ color: '#ff4d4f', fontWeight: 600, marginBottom: 8, textAlign: 'center' }}>
+          Hết credit! Vui lòng nạp thêm để tiếp tục sử dụng chức năng này.
+        </div>
+      )}
+      <button
+        onClick={handleStartBatchWriting}
+        disabled={isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.outline.trim()) || isOutOfCredit}
+        className="w-full bg-gradient-to-r from-indigo-700 to-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg"
+      >
         🚀 Bắt Đầu Viết Hàng Loạt ({inputItems.filter(it => it.outline.trim()).length} truyện)
       </button>
+      <CreditAlertBox credit={credit} loadingCredit={loadingCredit} />
 
       {isProcessingBatch && batchProgressMessage && <LoadingSpinner message={batchProgressMessage} />}
       {!isProcessingBatch && batchProgressMessage && <p className={`text-center font-semibold my-3 ${batchProgressMessage.includes("Hoàn thành") ? 'text-green-600' : 'text-indigo-600'}`}>{batchProgressMessage}</p>}

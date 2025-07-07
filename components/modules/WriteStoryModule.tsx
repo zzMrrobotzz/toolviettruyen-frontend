@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { ApiSettings, WriteStoryModuleState, WriteStoryActiveTab, BatchOutlineItem } from '../../types'; // Removed GeneratedBatchStoryItem
 import { 
@@ -14,15 +12,18 @@ import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
 import { delay } from '../../utils'; // Added delay import
+import axios from 'axios';
+import CreditAlertBox from '../CreditAlertBox';
 
 interface WriteStoryModuleProps {
   apiSettings: ApiSettings;
   moduleState: WriteStoryModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<WriteStoryModuleState>>;
   retrievedViralOutlineFromAnalysis: string | null;
+  currentKey: string;
 }
 
-const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis }) => {
+const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis, currentKey }) => {
   const {
     activeWriteTab,
     // Common settings
@@ -42,10 +43,9 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
 
   const [isSingleOutlineExpanded, setIsSingleOutlineExpanded] = useState(true);
   const [currentAbortController, setCurrentAbortController] = useState<AbortController | null>(null);
-
+  const [credit, setCredit] = useState<number | null>(null);
 
   const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
-
 
   const updateState = (updates: Partial<WriteStoryModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
@@ -242,6 +242,20 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
           await handleEditStory(fullStory, storyOutline, capturedKeyElements, undefined, abortCtrl); // Pass abortCtrl
       } else {
         updateState({ storyError: "Không thể tạo nội dung truyện.", storyLoadingMessage: null, storyProgress: 0 });
+      }
+
+      // Sau khi tạo xong bài viết hoàn chỉnh
+      try {
+        await axios.post(`${apiSettings.apiBase}/keys/use-credit`, { key: currentKey });
+        // Sau khi trừ credit, gọi lại API /validate để lấy số credit mới nhất
+        const res = await axios.post(`${apiSettings.apiBase}/validate`, { key: currentKey });
+        if (res.data?.keyInfo?.credit !== undefined) {
+          setCredit(res.data.keyInfo.credit);
+        }
+      } catch (err) {
+        alert('Hết credit hoặc lỗi khi trừ credit!');
+        setCredit(0);
+        return;
       }
     } catch (e: any) {
       if (e.name === 'AbortError') {
@@ -461,6 +475,32 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
                                 activeWriteTab === 'hookGenerator' ? hookLoadingMessage :
                                 activeWriteTab === 'lessonGenerator' ? lessonLoadingMessage : null;
 
+  // Định nghĩa fetchCredit trước renderCreditBox
+  const fetchCredit = async () => {
+    if (!currentKey) return;
+    try {
+      const res = await axios.post(`${apiSettings.apiBase}/validate`, { key: currentKey });
+      if (res.data?.keyInfo?.credit !== undefined) {
+        setCredit(res.data.keyInfo.credit);
+      }
+    } catch {
+      setCredit(null);
+    }
+  };
+  useEffect(() => { fetchCredit(); }, [currentKey, apiSettings.apiBase]);
+  const isOutOfCredit = credit !== null && credit <= 0;
+
+  // UI: Credit box + refresh
+  const renderCreditBox = () => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+      <div style={{ background: isOutOfCredit ? '#fff1f0' : '#e6fffb', color: isOutOfCredit ? '#ff4d4f' : '#1890ff', border: `1.5px solid ${isOutOfCredit ? '#ff4d4f' : '#1890ff'}`, borderRadius: 12, padding: '8px 20px', fontWeight: 600, fontSize: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 20 }}>💳</span>
+        Credit còn lại: <span style={{ fontWeight: 700 }}>{credit !== null ? credit : '...'}</span>
+        <button onClick={fetchCredit} style={{ marginLeft: 12, background: '#fff', border: '1px solid #1890ff', color: '#1890ff', borderRadius: 6, padding: '2px 10px', fontWeight: 500, cursor: 'pointer' }}>Làm mới</button>
+      </div>
+    </div>
+  );
+
   const renderMainButton = () => {
     let buttonText = "";
     let actionHandler: () => void = () => {};
@@ -501,19 +541,48 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     }
 
     return (
+      <>
+        {isOutOfCredit && (
+          <div style={{ color: '#ff4d4f', fontWeight: 600, marginBottom: 8, textAlign: 'center', fontSize: 18 }}>
+            Hết credit! Vui lòng nạp thêm để tiếp tục sử dụng chức năng này.
+          </div>
+        )}
       <button 
         onClick={actionHandler} 
-        disabled={disabled}
-        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+          disabled={isOutOfCredit || disabled}
+          className="w-full bg-gradient-to-r from-indigo-700 to-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg"
       >
-        {buttonText}
+          {currentLoadingMessage || buttonText}
       </button>
+      </>
     );
   };
 
+  // Định nghĩa CreditAlertBox giống style module Viết Lại Hàng Loạt
+  const CreditAlertBox = () => (
+    <div style={{
+      background: '#f8fff3',
+      border: '2px solid #ff4d4f',
+      borderRadius: 12,
+      padding: '12px 32px',
+      color: '#ff4d4f',
+      fontWeight: 700,
+      fontSize: 22,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      margin: '18px auto 24px auto',
+      maxWidth: 340
+    }}>
+      <span style={{ fontSize: 28, marginRight: 10 }}>💳</span>
+      Credit còn lại: {credit !== null ? credit : '...'}
+    </div>
+  );
 
   return (
-    <ModuleContainer title="✍️ Module: Viết Truyện, Hook & Bài Học">
+    <ModuleContainer title="✍️ Viết Truyện">
+      {/* Ô credit alert dưới tiêu đề */}
+      <CreditAlertBox />
         <InfoBox>
             <p><strong>📌 Quy trình Tạo Truyện Hoàn Chỉnh:</strong></p>
             <ol className="list-decimal list-inside space-y-1.5 text-sm mt-2">

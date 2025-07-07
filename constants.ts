@@ -1,4 +1,3 @@
-
 import { ActiveModule } from './types';
 
 export const APP_TITLE = "AI Story Creator Studio";
@@ -20,6 +19,7 @@ export const NAVIGATION_ITEMS = [
   { id: ActiveModule.ViralTitleGenerator, label: "Tạo Tiêu Đề Viral", icon: "🔥" }, 
   { id: ActiveModule.TTS, label: "Đọc Truyện AI", icon: "🎙️" },
   { id: ActiveModule.YouTubeSEO, label: "YouTube SEO & Từ Khóa", icon: "📊" },
+  { id: ActiveModule.Recharge, label: "Nạp Credit", icon: "💳" },
   { id: ActiveModule.Support, label: "Hỗ Trợ & Liên Hệ", icon: "📞" }, 
 ];
 
