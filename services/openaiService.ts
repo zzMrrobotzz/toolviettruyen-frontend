@@ -33,13 +33,12 @@ const mapAspectRatioToDallE3Size = (aspectRatio: string): string => {
 };
 
 const getEffectiveOpenAIApiKey = (apiKey?: string): string => {
-    const envKey = typeof window !== 'undefined' ? (window as any).process?.env?.OPENAI_API_KEY : process.env.OPENAI_API_KEY;
-    const effectiveApiKey = apiKey || envKey;
-    if (!effectiveApiKey) {
+    // Use provided API key or safe default
+    const effectiveApiKey = apiKey || 'default_openai_key_placeholder';
+    if (!effectiveApiKey || effectiveApiKey === 'default_openai_key_placeholder') {
         throw new Error(
             "OpenAI API Key không được tìm thấy. " +
-            "Vui lòng nhập API Key vào ô 'ChatGPT (DALL-E) API Key' trong module " +
-            "hoặc cấu hình biến môi trường OPENAI_API_KEY."
+            "Vui lòng nhập API Key vào ô 'ChatGPT (DALL-E) API Key' trong module."
         );
     }
     return effectiveApiKey;

@@ -34,18 +34,14 @@ const mapAspectRatioToDeepSeekSize = (aspectRatio: string): string => {
 };
 
 const getEffectiveDeepSeekApiKey = (imageApiKey?: string, generalApiKey?: string): string => {
-     const effectiveApiKey =
-        imageApiKey ||
-        generalApiKey ||
-        (typeof window !== 'undefined' ? ((window as any).process?.env?.DEEPSEEK_IMAGE_API_KEY || (window as any).process?.env?.DEEPSEEK_API_KEY)
-            : (process.env.DEEPSEEK_IMAGE_API_KEY || process.env.DEEPSEEK_API_KEY));
+    // Use provided API keys or safe default
+    const effectiveApiKey = imageApiKey || generalApiKey || 'default_deepseek_key_placeholder';
 
-    if (!effectiveApiKey) {
+    if (!effectiveApiKey || effectiveApiKey === 'default_deepseek_key_placeholder') {
         throw new Error(
             "DeepSeek API Key không được tìm thấy. " +
             "Vui lòng nhập API Key vào ô 'DeepSeek Image API Key' trong module, " +
-            "hoặc cấu hình trong Cài đặt AI chung (nếu DeepSeek là nhà cung cấp AI văn bản và dùng chung key), " +
-            "hoặc đặt biến môi trường DEEPSEEK_IMAGE_API_KEY / DEEPSEEK_API_KEY."
+            "hoặc cấu hình trong Cài đặt AI chung (nếu DeepSeek là nhà cung cấp AI văn bản và dùng chung key)."
         );
     }
     return effectiveApiKey;

@@ -3,9 +3,21 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: './',
   define: {
-    // Simple static definitions to prevent runtime errors
+    // Complete browser environment compatibility
     'process.env.NODE_ENV': '"production"',
     'global': 'globalThis',
+    'process': 'globalThis.process',
+    'require': 'undefined',
+  },
+  resolve: {
+    alias: {
+      // Prevent Node.js modules from causing issues
+      'buffer': 'buffer',
+      'process': 'process/browser',
+    }
+  },
+  optimizeDeps: {
+    include: ['buffer', 'process']
   },
   build: {
     target: 'es2015',
