@@ -6,20 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Story Creator Studio</title>
 
-    <script>
-      // Simulate process.env.API_KEY for browser environment if not set by a build tool.
-      // This is a placeholder. The actual API key MUST be configured in the deployment environment.
-      // This shim helps prevent the app from crashing due to an undefined process.env.API_KEY
-      // when running directly in a browser without a Node.js-like environment.
-      if (typeof window.process === 'undefined') {
-        window.process = { env: {} };
-      }
-      if (typeof window.process.env === 'undefined') {
-        window.process.env = {};
-      }
-      // Environment variables are handled by Vite build process
-      // No need for manual setup in production
-    </script>
+    <!-- Environment setup removed - handled by Vite build process -->
 <!-- Import maps removed for production build - Vite handles module resolution -->
 <link rel="stylesheet" href="/index.css">
 </head>

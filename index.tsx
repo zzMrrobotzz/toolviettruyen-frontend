@@ -2,18 +2,31 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
-// Async app loading with error boundary
+// Robust app initialization with comprehensive error handling
 async function initializeApp() {
   try {
-    const [{ default: App }, { default: ErrorBoundary }] = await Promise.all([
-      import('./App'),
-      import('./components/ErrorBoundary')
-    ]);
+    // Pre-validate environment
+    if (typeof window === 'undefined') {
+      throw new Error('Window object not available');
+    }
     
     const rootElement = document.getElementById('root');
     if (!rootElement) {
-      throw new Error("Could not find root element to mount to");
+      throw new Error('Could not find root element to mount to');
     }
+
+    // Load components with timeout
+    const modulePromise = Promise.race([
+      Promise.all([
+        import('./App'),
+        import('./components/ErrorBoundary')
+      ]),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Module loading timeout')), 10000)
+      )
+    ]);
+
+    const [{ default: App }, { default: ErrorBoundary }] = await modulePromise as [any, any];
 
     const root = ReactDOM.createRoot(rootElement);
     root.render(
@@ -23,8 +36,10 @@ async function initializeApp() {
         </ErrorBoundary>
       </React.StrictMode>
     );
+    
+    console.log('✅ App initialized successfully');
   } catch (error) {
-    console.error('Failed to initialize app:', error);
+    console.error('❌ Failed to initialize app:', error);
     
     // Fallback UI
     const rootElement = document.getElementById('root');
