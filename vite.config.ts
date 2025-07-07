@@ -20,7 +20,7 @@ export default defineConfig({
     include: ['buffer', 'process']
   },
   build: {
-    sourcemap: true,
+    sourcemap: false,
     target: 'es2015',
     rollupOptions: {
       output: {
