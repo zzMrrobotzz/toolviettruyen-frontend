@@ -630,3 +630,108 @@ export interface ThumbnailTextResponse {
 export interface GeminiSubPromptsResponse {
   image_prompts: string[];
 }
+
+// Props for UI Components (Main App)
+// =================================================================
+interface SidebarProps {
+  activeModule: ActiveModule;
+  setActiveModule: (module: ActiveModule) => void;
+}
+
+interface MainHeaderProps {
+  activeModule: ActiveModule;
+  onSettingsClick: () => void;
+}
+
+interface ApiSettingsComponentProps {
+  onClose: () => void;
+}
+
+// Props for Modules (Passed from App.tsx)
+// =================================================================
+interface SuperAgentModuleProps {
+    elevenLabsApiKeys: ElevenLabsApiKey[];
+    setElevenLabsApiKeys: React.Dispatch<React.SetStateAction<ElevenLabsApiKey[]>>;
+    moduleState: SuperAgentModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<SuperAgentModuleState>>;
+}
+
+interface CreativeLabModuleProps {
+    setActiveModule: (module: ActiveModule) => void;
+    setStoryOutlineForWriteModule: (outline: string) => void;
+    setOutlineForSuperAgent: (outline: string) => void;
+    moduleState: CreativeLabModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<CreativeLabModuleState>>;
+}
+
+interface WriteStoryModuleProps {
+    moduleState: WriteStoryModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<WriteStoryModuleState>>;
+    retrievedViralOutlineFromAnalysis: string;
+}
+
+interface BatchStoryWritingModuleProps {
+    moduleState: BatchStoryWritingModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<BatchStoryWritingModuleState>>;
+}
+
+interface RewriteModuleProps {
+    moduleState: RewriteModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<RewriteModuleState>>;
+}
+
+interface BatchRewriteModuleProps {
+    moduleState: BatchRewriteModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<BatchRewriteModuleState>>;
+}
+
+interface AnalysisModuleProps {
+    moduleState: AnalysisModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<AnalysisModuleState>>;
+}
+
+interface NicheThemeExplorerModuleProps {
+    moduleState: NicheThemeExplorerModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<NicheThemeExplorerModuleState>>;
+}
+
+interface Dream100CompetitorAnalysisModuleProps {
+    moduleState: Dream100CompetitorAnalysisModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<Dream100CompetitorAnalysisModuleState>>;
+}
+
+interface TtsModuleProps {
+    elevenLabsApiKeys: ElevenLabsApiKey[];
+    setElevenLabsApiKeys: React.Dispatch<React.SetStateAction<ElevenLabsApiKey[]>>;
+    moduleState: TtsModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<TtsModuleState>>;
+}
+
+interface YoutubeSeoModuleProps {
+    moduleState: YoutubeSeoModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<YoutubeSeoModuleState>>;
+}
+
+interface ViralTitleGeneratorModuleProps {
+    moduleState: ViralTitleGeneratorModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<ViralTitleGeneratorModuleState>>;
+}
+
+interface ImageGenerationSuiteModuleProps {
+    moduleState: ImageGenerationSuiteModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<ImageGenerationSuiteModuleState>>;
+}
+
+interface CharacterStudioModuleProps {
+    moduleState: CharacterStudioModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<CharacterStudioModuleState>>;
+}
+
+interface EditStoryModuleProps {
+    moduleState: EditStoryModuleState;
+    setModuleState: React.Dispatch<React.SetStateAction<EditStoryModuleState>>;
+}
+
+// Support and Recharge modules do not need props as they will use context
+interface SupportModuleProps {}
+interface RechargeModuleProps {}

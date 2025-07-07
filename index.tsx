@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
+import { AppProvider } from './AppContext';
 
 const container = document.getElementById('root');
 if (container) {
@@ -9,7 +10,9 @@ if (container) {
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
-        <App />
+        <AppProvider>
+          <App />
+        </AppProvider>
       </ErrorBoundary>
     </React.StrictMode>
   );

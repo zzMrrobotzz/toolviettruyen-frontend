@@ -47,19 +47,24 @@ import CharacterStudioModule from './components/modules/CharacterStudioModule'; 
 import SupportModule from './components/modules/SupportModule'; // Added
 import RechargeModule from './components/modules/RechargeModule'; // Đã thêm đúng
 import axios from "axios";
+import { useAppContext } from './AppContext';
 
-// Địa chỉ backend API
+// API base URL
 const API_BASE = "https://key-manager-backend.onrender.com/api";
 
+// Define a default, empty API settings object that matches the type
+const defaultApiSettings: ApiSettings = {
+  provider: DEFAULT_API_PROVIDER as ApiProvider,
+  apiKey: '',
+  apiBase: API_BASE, // Add the missing apiBase property
+};
+
 const App: React.FC = () => {
+  const { apiSettings, setApiSettings, key, setKey } = useAppContext(); // Use context
   const [activeModule, setActiveModule] = useState<ActiveModule>(ActiveModule.SuperAgent);
   const [elevenLabsApiKeys, setElevenLabsApiKeys] = useState<ElevenLabsApiKey[]>(() => {
     const savedKeys = localStorage.getItem('elevenLabsApiKeys');
     return savedKeys ? JSON.parse(savedKeys) : [];
-  });
-  const [apiSettings, setApiSettings] = useState<ApiSettings>({
-    provider: DEFAULT_API_PROVIDER as ApiProvider,
-    apiKey: '',
   });
 
   const [storyOutlineForWriteModule, setStoryOutlineForWriteModule] = useState<string>('');
@@ -142,28 +147,7 @@ const App: React.FC = () => {
     // Batch story fields removed
   };
 
-  const [writeStoryState, setWriteStoryState] = useState<WriteStoryModuleState>(() => {
-    const savedState = localStorage.getItem('writeStoryModuleState_v1');
-    if (savedState) {
-      try {
-        const parsedState = JSON.parse(savedState);
-        // Ensure output fields are reset, effectively not persisted from localStorage
-        return {
-          ...initialWriteStoryState, // Start with defaults for output fields
-          ...parsedState,            // Override with saved settings
-          generatedStory: '',        // Explicitly clear output
-          generatedHooks: '',
-          generatedLesson: '',
-          // storyInputForHook, storyInputForLesson, hookStructure, ctaChannelForLesson will be retained from parsedState if present
-          // generatedBatchStories removed
-        };
-      } catch (error) {
-        console.error("Error parsing saved WriteStoryModuleState:", error);
-        return initialWriteStoryState;
-      }
-    }
-    return initialWriteStoryState;
-  });
+  const [writeStoryState, setWriteStoryState] = useState<WriteStoryModuleState>(initialWriteStoryState);
 
   const initialRewriteState: RewriteModuleState = {
     rewriteLevel: 50,
@@ -183,25 +167,7 @@ const App: React.FC = () => {
     hasSingleRewriteBeenEdited: false,
   };
 
-  const [rewriteState, setRewriteState] = useState<RewriteModuleState>(() => {
-    const savedState = localStorage.getItem('rewriteModuleState_v1');
-    if (savedState) {
-      try {
-        const parsedState = JSON.parse(savedState);
-        // Ensure output fields and session-specific edit statuses are reset
-        return {
-          ...initialRewriteState,   // Start with defaults for output fields and edit statuses
-          ...parsedState,           // Override with saved settings
-          singleRewrittenText: '',  // Explicitly clear output
-          hasSingleRewriteBeenEdited: false, // Reset edit status
-        };
-      } catch (error) {
-        console.error("Error parsing saved RewriteModuleState:", error);
-        return initialRewriteState;
-      }
-    }
-    return initialRewriteState;
-  });
+  const [rewriteState, setRewriteState] = useState<RewriteModuleState>(initialRewriteState);
   
   const [analysisState, setAnalysisState] = useState<AnalysisModuleState>({
     sourceText: '', analysisFactors: [], suggestions: '', improvedStory: '', viralOutlineAnalysisResult: '',
@@ -273,34 +239,7 @@ const App: React.FC = () => {
     analyzeError: null,
     groundingSourcesAnalysis: [],
   };
-  const [viralTitleGeneratorState, setViralTitleGeneratorState] = useState<ViralTitleGeneratorModuleState>(() => {
-    const savedState = localStorage.getItem('viralTitleGeneratorModuleState_v1');
-    if (savedState) {
-        try {
-            const parsedState = JSON.parse(savedState);
-            return {
-                ...initialViralTitleGeneratorState,
-                ...parsedState,
-                // Reset output fields
-                resultText: '',
-                analysisReport: '',
-                viralFormulas: '',
-                applicationSuggestions: '',
-                groundingSourcesAnalysis: [],
-                generateVariationsExplanation: null,
-                // Reset loading/error messages
-                loadingMessage: null,
-                error: null,
-                analyzeLoadingMessage: null,
-                analyzeError: null,
-            };
-        } catch (e) {
-            console.error("Error parsing ViralTitleGeneratorModuleState from localStorage", e);
-            return initialViralTitleGeneratorState;
-        }
-    }
-    return initialViralTitleGeneratorState;
-  });
+  const [viralTitleGeneratorState, setViralTitleGeneratorState] = useState<ViralTitleGeneratorModuleState>(initialViralTitleGeneratorState);
 
 
   const initialImageGenerationSuiteState: ImageGenerationSuiteModuleState = {
@@ -332,49 +271,7 @@ const App: React.FC = () => {
     isRefining: false,
     refinementError: null,
   };
-  const [imageGenerationSuiteState, setImageGenerationSuiteState] = useState<ImageGenerationSuiteModuleState>(() => {
-      const savedState = localStorage.getItem('imageGenerationSuiteState_v1');
-      if (savedState) {
-          try {
-              const parsedState = JSON.parse(savedState);
-              // Ensure activeTab is valid, default if not
-              const validTabs: ImageGenerationSuiteModuleState['activeTab'][] = ['hookStory', 'batch', 'intelligentContextImageGenerator', 'intelligentContextPromptGenerator'];
-              let currentActiveTab = parsedState.activeTab;
-              if (currentActiveTab === 'contextualHookStory') { // Migration for old name
-                currentActiveTab = 'intelligentContextImageGenerator';
-              }
-              if (!validTabs.includes(currentActiveTab)) {
-                currentActiveTab = 'hookStory';
-              }
-              
-
-              return {
-                  ...initialImageGenerationSuiteState,
-                  ...parsedState,
-                  activeTab: currentActiveTab, // Ensure activeTab is valid
-                  generatedSingleImages: [], // Clear outputs
-                  generatedBatchImages: [],
-                  singleImageOverallError: null,
-                  singleImageProgressMessage: null,
-                  batchOverallError: null,
-                  batchProgressMessage: null,
-                  generatedCtxPrompts: [], // Clear new output
-                  ctxPromptsError: null,
-                  ctxPromptsLoadingMessage: null,
-                  settingsError: null,
-                  showRefinementModal: false,
-                  activeRefinementItem: null,
-                  refinementPrompt: '',
-                  isRefining: false,
-                  refinementError: null,
-              };
-          } catch (e) {
-              console.error("Error parsing ImageGenerationSuiteModuleState from localStorage", e);
-              return initialImageGenerationSuiteState;
-          }
-      }
-      return initialImageGenerationSuiteState;
-  });
+  const [imageGenerationSuiteState, setImageGenerationSuiteState] = useState<ImageGenerationSuiteModuleState>(initialImageGenerationSuiteState);
 
   const initialEditStoryState: EditStoryModuleState = {
     activeTab: 'single', // Default to single edit tab
@@ -399,32 +296,7 @@ const App: React.FC = () => {
     batchEditError: null,
     batchConcurrencyLimit: 3,
   };
-  const [editStoryState, setEditStoryState] = useState<EditStoryModuleState>(() => {
-    const savedState = localStorage.getItem('editStoryModuleState_v1');
-    if (savedState) {
-        try {
-            const parsedState = JSON.parse(savedState);
-            return {
-                ...initialEditStoryState, // Start with defaults for output/processing fields
-                ...parsedState,           // Override with saved settings (activeTab, inputs)
-                editedStoryOutput: '',    // Clear single edit output
-                postEditAnalysis: null,   // Clear single edit analysis
-                isLoadingEditing: false,
-                loadingMessageEditing: null,
-                refinementInstruction: '', // Clear refinement instruction
-                isRefiningFurther: false,
-                furtherRefinementError: null,
-                batchResults: [],         // Clear batch results
-                isProcessingBatchEdit: false,
-                batchEditProgressMessage: null,
-            };
-        } catch (error) {
-            console.error("Error parsing saved EditStoryModuleState:", error);
-            return initialEditStoryState;
-        }
-    }
-    return initialEditStoryState;
-  });
+  const [editStoryState, setEditStoryState] = useState<EditStoryModuleState>(initialEditStoryState);
 
   const initialBatchStoryWritingState: BatchStoryWritingModuleState = {
     inputItems: [{ id: Date.now().toString(), outline: '', specificTargetLength: null, specificWritingStyle: null, specificCustomWritingStyle: null }],
@@ -467,26 +339,7 @@ const App: React.FC = () => {
     error: null,
     progressMessage: null,
   };
-  const [nicheThemeExplorerState, setNicheThemeExplorerState] = useState<NicheThemeExplorerModuleState>(() => {
-    const savedState = localStorage.getItem('nicheThemeExplorerModuleState_v1');
-    if (savedState) {
-        try {
-            const parsed = JSON.parse(savedState);
-            return {
-                ...initialNicheThemeExplorerState,
-                ...parsed,
-                analysisResults: [],
-                isLoading: false,
-                error: null,
-                progressMessage: null,
-            };
-        } catch (e) {
-            console.error("Error parsing NicheThemeExplorerModuleState from localStorage", e);
-            return initialNicheThemeExplorerState;
-        }
-    }
-    return initialNicheThemeExplorerState;
-  });
+  const [nicheThemeExplorerState, setNicheThemeExplorerState] = useState<NicheThemeExplorerModuleState>(initialNicheThemeExplorerState);
 
   const initialDream100State: Dream100CompetitorAnalysisModuleState = {
     inputChannelUrl: '',
@@ -531,7 +384,6 @@ const App: React.FC = () => {
   };
   const [characterStudioState, setCharacterStudioState] = useState<CharacterStudioModuleState>(initialCharacterStudioState);
 
-  const [key, setKey] = useState<string>(localStorage.getItem("license_key") || "");
   const [isValid, setIsValid] = useState<boolean>(!!key);
   const [inputKey, setInputKey] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -927,7 +779,7 @@ const App: React.FC = () => {
       case ActiveModule.Support: 
         return <SupportModule />;
       case ActiveModule.Recharge:
-        return <RechargeModule currentKey={key} />;
+        return <RechargeModule />;
       default:
         return <div className="p-6 text-center text-gray-600">Chọn một module từ thanh bên để bắt đầu.</div>;
     }
@@ -955,7 +807,10 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-900 to-gray-800">
-      <Sidebar activeModule={activeModule} setActiveModule={setActiveModule} />
+      <Sidebar 
+        activeModule={activeModule} 
+        setActiveModule={setActiveModule} 
+      />
       <main className="flex-1 ml-64 p-3 md:p-6 bg-gray-100 rounded-l-3xl shadow-2xl overflow-y-auto">
         <div className="bg-white shadow-xl rounded-2xl min-h-full flex flex-col">
             <MainHeader />
