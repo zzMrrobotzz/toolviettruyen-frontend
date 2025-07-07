@@ -9,3 +9,7 @@ release/
 *.dll
 *.asar
 .DS_Store
+
+# Submodules - deploy riêng
+key-admin/
+key-manager-backend/
