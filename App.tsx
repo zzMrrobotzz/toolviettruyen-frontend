@@ -32,12 +32,12 @@ import CreativeLabModule from './components/modules/CreativeLabModule';
 import WriteStoryModule from './components/modules/WriteStoryModule';
 import RewriteModule from './components/modules/RewriteModule';
 import AnalysisModule from './components/modules/AnalysisModule';
-import TtsModule from '@/components/modules/TtsModule'; // Assuming TtsModule uses alias from importmap
+import TtsModule from './components/modules/TtsModule';
 import YoutubeSeoModule from './components/modules/YoutubeSeoModule';
 // import ImageByHookModule from './components/modules/ImageByHookModule'; // Removed
 import ViralTitleGeneratorModule from './components/modules/ViralTitleGeneratorModule';
 // import BatchImageGeneratorModule from './components/modules/BatchImageGeneratorModule'; // Removed
-import ImageGenerationSuiteModule from '@/components/modules/ImageGenerationSuiteModule'; // Updated path
+import ImageGenerationSuiteModule from './components/modules/ImageGenerationSuiteModule';
 import EditStoryModule from './components/modules/EditStoryModule'; // Added
 import BatchStoryWritingModule from './components/modules/BatchStoryWritingModule'; // Added
 import BatchRewriteModule from './components/modules/BatchRewriteModule'; // Added

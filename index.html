@@ -17,41 +17,10 @@
       if (typeof window.process.env === 'undefined') {
         window.process.env = {};
       }
-      // Set default API keys to prevent undefined errors
-      if (typeof window.process.env.API_KEY === 'undefined') {
-        window.process.env.API_KEY = "default_gemini_key_placeholder";
-      }
-      if (typeof window.process.env.GEMINI_API_KEY === 'undefined') {
-        window.process.env.GEMINI_API_KEY = "default_gemini_key_placeholder";  
-      }
-      if (typeof window.process.env.OPENAI_API_KEY === 'undefined') {
-        window.process.env.OPENAI_API_KEY = "default_openai_key_placeholder";
-      }
-      if (typeof window.process.env.ELEVENLABS_API_KEY === 'undefined') {
-        window.process.env.ELEVENLABS_API_KEY = "default_elevenlabs_key_placeholder";
-      }
-      if (typeof window.process.env.STABILITY_API_KEY === 'undefined') {
-        window.process.env.STABILITY_API_KEY = "default_stability_key_placeholder";
-      }
+      // Environment variables are handled by Vite build process
+      // No need for manual setup in production
     </script>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
-    "@google/genai": "https://esm.sh/@google/genai@0.11.0",
-    "@/components/modules/TtsModule": "./components/modules/TtsModule.tsx",
-    "@/components/modules/ImageGenerationSuiteModule": "./components/modules/ImageGenerationSuiteModule.tsx", 
-    "@/services/openaiService": "./services/openaiService.ts",
-    "@/services/deepseekService": "./services/deepseekService.ts",
-    "@/services/geminiService": "./services/geminiService.ts",
-    "@/services/elevenLabsService": "./services/elevenLabsService.ts",
-    "@/services/stabilityAiService": "./services/stabilityAiService.ts"
-  }
-}
-</script>
+<!-- Import maps removed for production build - Vite handles module resolution -->
 <link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-gray-100">
