@@ -7,7 +7,6 @@ export default defineConfig({
     'process.env.NODE_ENV': '"production"',
     'global': 'globalThis',
     'process': 'globalThis.process',
-    'require': 'undefined',
   },
   resolve: {
     alias: {
@@ -20,6 +19,7 @@ export default defineConfig({
     include: ['buffer', 'process']
   },
   build: {
+    minify: false, // Disable minification for debugging
     sourcemap: false,
     target: 'es2015',
     rollupOptions: {
