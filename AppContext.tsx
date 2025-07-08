@@ -9,6 +9,8 @@ interface AppContextType {
   setApiSettings: React.Dispatch<React.SetStateAction<ApiSettings>>;
   key: string;
   setKey: React.Dispatch<React.SetStateAction<string>>;
+  keyInfo: any; // Consider creating a more specific type for keyInfo
+  setKeyInfo: React.Dispatch<React.SetStateAction<any>>;
 }
 
 const defaultApiSettings: ApiSettings = {
@@ -22,8 +24,9 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [apiSettings, setApiSettings] = useState<ApiSettings>(defaultApiSettings);
   const [key, setKey] = useState<string>('');
+  const [keyInfo, setKeyInfo] = useState<any>(null);
 
-  const value = { apiSettings, setApiSettings, key, setKey };
+  const value = { apiSettings, setApiSettings, key, setKey, keyInfo, setKeyInfo };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
