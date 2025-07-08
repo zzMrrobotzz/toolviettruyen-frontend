@@ -395,7 +395,7 @@ const App: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post(`${API_BASE}/validate`, { key: inputKey });
+      const res = await axios.post(`${API_BASE}/keys/validate`, { key: inputKey });
       if (res.data.valid) {
         setKey(inputKey);
         setIsValid(true);
@@ -406,7 +406,7 @@ const App: React.FC = () => {
         setError("Key không hợp lệ hoặc đã bị thu hồi!");
       }
     } catch (err) {
-      setError("Không kết nối được tới server!");
+      setError("Không kết nối được tới server hoặc key không hợp lệ!");
     }
     setLoading(false);
   };
@@ -654,7 +654,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedKey = localStorage.getItem("license_key");
     if (savedKey) {
-      axios.post(`${API_BASE}/validate`, { key: savedKey }).then(res => {
+      axios.post(`${API_BASE}/keys/validate`, { key: savedKey }).then(res => {
         if (res.data.valid) {
           setIsValid(true);
           setKey(savedKey);
