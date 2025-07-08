@@ -16,15 +16,15 @@ import { delay } from '../../utils';
 import axios from 'axios';
 import { Card, Spin } from 'antd';
 import CreditAlertBox from '../CreditAlertBox';
+import { useAppContext } from '../../AppContext';
 
 interface BatchRewriteModuleProps {
-  apiSettings: ApiSettings;
   moduleState: BatchRewriteModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<BatchRewriteModuleState>>;
-  currentKey: string;
 }
 
-const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, moduleState, setModuleState, currentKey }) => {
+const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ moduleState, setModuleState }) => {
+  const { apiSettings, key: currentKey } = useAppContext(); // Use context
   const {
     inputItems, results, globalRewriteLevel, globalSourceLanguage, globalTargetLanguage,
     globalRewriteStyle, globalCustomRewriteStyle, globalAdaptContext,

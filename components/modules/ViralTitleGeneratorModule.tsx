@@ -7,14 +7,15 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
+import { useAppContext } from '../../AppContext';
 
 interface ViralTitleGeneratorModuleProps {
-  apiSettings: ApiSettings;
   moduleState: ViralTitleGeneratorModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<ViralTitleGeneratorModuleState>>;
 }
 
-const ViralTitleGeneratorModule: React.FC<ViralTitleGeneratorModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
+const ViralTitleGeneratorModule: React.FC<ViralTitleGeneratorModuleProps> = ({ moduleState, setModuleState }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     activeTab, resultText, outputLanguage, loadingMessage, error,
     // Generate Variations Tab

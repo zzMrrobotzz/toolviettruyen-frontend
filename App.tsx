@@ -679,7 +679,6 @@ const App: React.FC = () => {
     switch (activeModule) {
       case ActiveModule.SuperAgent:
         return <SuperAgentModule 
-                  apiSettings={apiSettings} 
                   elevenLabsApiKeys={elevenLabsApiKeys}
                   setElevenLabsApiKeys={setElevenLabsApiKeys}
                   moduleState={superAgentState}
@@ -687,7 +686,6 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.CreativeLab:
         return <CreativeLabModule 
-                  apiSettings={apiSettings} 
                   setActiveModule={setActiveModule}
                   setStoryOutlineForWriteModule={setStoryOutlineForWriteModule} 
                   // onSendBatchOutlinesToStoryModule removed
@@ -697,50 +695,42 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.WriteStory:
         return <WriteStoryModule 
-                  apiSettings={apiSettings}
                   moduleState={writeStoryState}
                   setModuleState={setWriteStoryState}
                   retrievedViralOutlineFromAnalysis={analysisState.viralOutlineAnalysisResult}
                 />;
       case ActiveModule.BatchStoryWriting: // Added
         return <BatchStoryWritingModule 
-                  apiSettings={apiSettings}
                   moduleState={batchStoryWritingState}
                   setModuleState={setBatchStoryWritingState}
                 />;
       case ActiveModule.Rewrite:
         return <RewriteModule 
-                  apiSettings={apiSettings} 
                   moduleState={rewriteState}
                   setModuleState={setRewriteState}
                 />;
       case ActiveModule.BatchRewrite: // Added
         return <BatchRewriteModule 
-                  apiSettings={apiSettings} 
                   moduleState={batchRewriteState}
                   setModuleState={setBatchRewriteState}
                 />;
       case ActiveModule.Analysis:
         return <AnalysisModule 
-                  apiSettings={apiSettings}
                   moduleState={analysisState}
                   setModuleState={setAnalysisState}
                 />;
        case ActiveModule.NicheThemeExplorer:
         return <NicheThemeExplorerModule 
-                  apiSettings={apiSettings}
                   moduleState={nicheThemeExplorerState}
                   setModuleState={setNicheThemeExplorerState}
                 />;
        case ActiveModule.Dream100CompetitorAnalysis: // Added
         return <Dream100CompetitorAnalysisModule
-                  apiSettings={apiSettings}
                   moduleState={dream100State}
                   setModuleState={setDream100State}
                 />;
       case ActiveModule.TTS:
         return <TtsModule 
-                  apiSettings={apiSettings}
                   elevenLabsApiKeys={elevenLabsApiKeys} 
                   setElevenLabsApiKeys={setElevenLabsApiKeys}
                   moduleState={ttsState}
@@ -748,31 +738,26 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.YouTubeSEO:
         return <YoutubeSeoModule 
-                  apiSettings={apiSettings}
                   moduleState={youtubeSeoState}
                   setModuleState={setYoutubeSeoState}
                 />;
       case ActiveModule.ViralTitleGenerator:
         return <ViralTitleGeneratorModule 
-                  apiSettings={apiSettings}
                   moduleState={viralTitleGeneratorState}
                   setModuleState={setViralTitleGeneratorState}
                  />;
       case ActiveModule.ImageGenerationSuite: 
         return <ImageGenerationSuiteModule 
-                  apiSettings={apiSettings} 
                   moduleState={imageGenerationSuiteState}
                   setModuleState={setImageGenerationSuiteState}
                 />;
       case ActiveModule.CharacterStudio: // Added
         return <CharacterStudioModule
-                  apiSettings={apiSettings}
                   moduleState={characterStudioState}
                   setModuleState={setCharacterStudioState}
                 />;
       case ActiveModule.EditStory:
         return <EditStoryModule
-                  apiSettings={apiSettings}
                   moduleState={editStoryState}
                   setModuleState={setEditStoryState}
                 />;

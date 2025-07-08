@@ -20,17 +20,17 @@ import { generateText as generateDeepSeekText, generateTextWithJsonOutput as gen
 import { delay } from '../../utils';
 import axios from 'axios';
 import CreditAlertBox from '../CreditAlertBox';
+import { useAppContext } from '../../AppContext';
 
 interface BatchStoryWritingModuleProps {
-  apiSettings: ApiSettings;
   moduleState: BatchStoryWritingModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<BatchStoryWritingModuleState>>;
-  currentKey: string;
 }
 
 const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({ 
-    apiSettings, moduleState, setModuleState, currentKey 
+    moduleState, setModuleState
 }) => {
+  const { apiSettings, key: currentKey } = useAppContext(); // Use context
   const {
     inputItems, results, globalTargetLength, globalWritingStyle, globalCustomWritingStyle,
     outputLanguage, referenceViralStoryForStyle, isProcessingBatch,

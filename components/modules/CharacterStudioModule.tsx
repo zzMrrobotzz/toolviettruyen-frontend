@@ -10,16 +10,17 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
+import { useAppContext } from '../../AppContext';
 
 interface CharacterStudioModuleProps {
-  apiSettings: ApiSettings;
   moduleState: CharacterStudioModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<CharacterStudioModuleState>>;
 }
 
 const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({ 
-    apiSettings, moduleState, setModuleState 
+    moduleState, setModuleState 
 }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     characterName,
     characterAge,

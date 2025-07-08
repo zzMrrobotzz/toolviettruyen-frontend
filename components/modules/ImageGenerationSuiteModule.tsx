@@ -17,9 +17,9 @@ import { generateStabilityImage, refineStabilityImage } from '../../services/sta
 import { generateDallEImage, editDallEImage } from '../../services/openaiService'; 
 import { generateDeepSeekImage, refineDeepSeekImage } from '../../services/deepseekService'; 
 import { delay, dataUrlToBlob } from '../../utils'; 
+import { useAppContext } from '../../AppContext';
 
 interface ImageGenerationSuiteModuleProps {
-  apiSettings: ApiSettings;
   moduleState: ImageGenerationSuiteModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<ImageGenerationSuiteModuleState>>;
 }
@@ -33,8 +33,9 @@ const parseDataUrl = (dataUrl: string): { base64: string; mimeType: string } | n
 
 
 const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
-  apiSettings, moduleState, setModuleState
+  moduleState, setModuleState
 }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     activeTab, selectedArtStyle, aspectRatio, imageEngine,
     stabilityApiKey, chatGptApiKey, deepSeekImageApiKey, 

@@ -9,10 +9,9 @@ import InfoBox from '../InfoBox';
 import { generateText, generateImage } from '../../services/geminiService';
 import { fetchElevenLabsVoices, generateElevenLabsSpeech } from '../../services/elevenLabsService';
 import { delay } from '../../utils'; // Added delay import
+import { useAppContext } from '../../AppContext';
 
 interface SuperAgentModuleProps {
-  apiSettings: ApiSettings;
-  // characters: Character[]; // Removed
   elevenLabsApiKeys: ElevenLabsApiKey[];
   setElevenLabsApiKeys: (keys: ElevenLabsApiKey[]) => void;
   moduleState: SuperAgentModuleState;
@@ -20,10 +19,11 @@ interface SuperAgentModuleProps {
 }
 
 const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({ 
-  apiSettings, /*characters,*/ elevenLabsApiKeys, setElevenLabsApiKeys, moduleState, setModuleState 
+  elevenLabsApiKeys, setElevenLabsApiKeys, moduleState, setModuleState 
 }) => {
+  const { apiSettings } = useAppContext(); // Use context to get apiSettings
   const {
-    sourceText, wordCount, imageCount, aspectRatio, // selectedCharacterId removed
+    sourceText, wordCount, imageCount, aspectRatio,
     selectedTtsApiKey, availableVoices, selectedTtsVoiceId,
     generatedStory, generatedImages, generatedAudioUrl, ttsError, error
   } = moduleState;

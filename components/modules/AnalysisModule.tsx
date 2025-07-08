@@ -6,14 +6,15 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
+import { useAppContext } from '../../AppContext';
 
 interface AnalysisModuleProps {
-  apiSettings: ApiSettings;
   moduleState: AnalysisModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<AnalysisModuleState>>;
 }
 
-const AnalysisModule: React.FC<AnalysisModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
+const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleState }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     sourceText, analysisFactors, suggestions, improvedStory, viralOutlineAnalysisResult,
     loadingMessage, errorAnalysis, errorImprovement, errorViralOutline

@@ -11,16 +11,17 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateTextWithJsonOutput } from '../../services/geminiService';
+import { useAppContext } from '../../AppContext';
 
 interface NicheThemeExplorerModuleProps {
-  apiSettings: ApiSettings;
   moduleState: NicheThemeExplorerModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<NicheThemeExplorerModuleState>>;
 }
 
 const NicheThemeExplorerModule: React.FC<NicheThemeExplorerModuleProps> = ({ 
-    apiSettings, moduleState, setModuleState 
+    moduleState, setModuleState 
 }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     inputTitles, inputLanguage, outputLanguage, numNichesToSuggest,
     analysisResults, isLoading, error, progressMessage

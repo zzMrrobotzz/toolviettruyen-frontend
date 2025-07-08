@@ -13,14 +13,15 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
+import { useAppContext } from '../../AppContext';
 
 interface YoutubeSeoModuleProps {
-  apiSettings: ApiSettings;
   moduleState: YoutubeSeoModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<YoutubeSeoModuleState>>;
 }
 
-const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
+const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ moduleState, setModuleState }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     activeSeoTab, videoTitle, youtubeOutline, language, timelineCount, videoDuration,
     videoKeywords, youtubeDescription, youtubeTags, keywordTopic, suggestedKeywordsOutput,

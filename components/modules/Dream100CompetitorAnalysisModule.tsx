@@ -12,16 +12,17 @@ import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
+import { useAppContext } from '../../AppContext';
 
 interface Dream100CompetitorAnalysisModuleProps {
-  apiSettings: ApiSettings;
   moduleState: Dream100CompetitorAnalysisModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<Dream100CompetitorAnalysisModuleState>>;
 }
 
 const Dream100CompetitorAnalysisModule: React.FC<Dream100CompetitorAnalysisModuleProps> = ({
-    apiSettings, moduleState, setModuleState
+    moduleState, setModuleState
 }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     inputChannelUrl, numberOfSuggestions, outputLanguage,
     analysisResults, isLoading, error, progressMessage, groundingSources,

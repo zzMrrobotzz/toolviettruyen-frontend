@@ -14,16 +14,16 @@ import { generateText } from '../../services/geminiService';
 import { delay } from '../../utils'; // Added delay import
 import axios from 'axios';
 import CreditAlertBox from '../CreditAlertBox';
+import { useAppContext } from '../../AppContext';
 
 interface WriteStoryModuleProps {
-  apiSettings: ApiSettings;
   moduleState: WriteStoryModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<WriteStoryModuleState>>;
   retrievedViralOutlineFromAnalysis: string | null;
-  currentKey: string;
 }
 
-const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis, currentKey }) => {
+const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ moduleState, setModuleState, retrievedViralOutlineFromAnalysis }) => {
+  const { apiSettings, key: currentKey } = useAppContext(); // Use context
   const {
     activeWriteTab,
     // Common settings

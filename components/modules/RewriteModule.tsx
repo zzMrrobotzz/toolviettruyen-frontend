@@ -11,14 +11,15 @@ import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
 import { delay } from '../../utils'; // Added delay import
+import { useAppContext } from '../../AppContext';
 
 interface RewriteModuleProps {
-  apiSettings: ApiSettings;
   moduleState: RewriteModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<RewriteModuleState>>;
 }
 
-const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
+const RewriteModule: React.FC<RewriteModuleProps> = ({ moduleState, setModuleState }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     // Common
     rewriteLevel, sourceLanguage, targetLanguage, rewriteStyle, customRewriteStyle, adaptContext,

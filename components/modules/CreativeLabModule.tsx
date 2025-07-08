@@ -2,29 +2,28 @@
 
 
 import React from 'react'; 
-import { ApiSettings, ActiveModule, CreativeLabModuleState, CreativeLabActiveTab, GeneratedBatchOutlineItem } from '../../types';
+import { ActiveModule, CreativeLabModuleState, CreativeLabActiveTab, GeneratedBatchOutlineItem } from '../../types';
 import { PLOT_STRUCTURE_OPTIONS, HOOK_LANGUAGE_OPTIONS, OUTLINE_DETAIL_LEVEL_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText } from '../../services/geminiService';
+import { useAppContext } from '../../AppContext';
 
 interface CreativeLabModuleProps {
-  apiSettings: ApiSettings;
   setActiveModule: (module: ActiveModule) => void;
   setStoryOutlineForWriteModule: (outline: string) => void; 
-  // onSendBatchOutlinesToStoryModule prop removed
   setOutlineForSuperAgent: (outline: string) => void;
   moduleState: CreativeLabModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<CreativeLabModuleState>>;
 }
 
 const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({ 
-  apiSettings, setActiveModule, setStoryOutlineForWriteModule, 
-  // onSendBatchOutlinesToStoryModule removed
+  setActiveModule, setStoryOutlineForWriteModule, 
   setOutlineForSuperAgent, moduleState, setModuleState 
 }) => {
+  const { apiSettings } = useAppContext();
   const {
     // Common settings
     ideaLanguage, outputLanguage, plotStructure, customPlot, outlineDetailLevel, referenceViralOutline,

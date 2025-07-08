@@ -17,14 +17,15 @@ import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
 import { delay } from '../../utils';
+import { useAppContext } from '../../AppContext';
 
 interface EditStoryModuleProps {
-  apiSettings: ApiSettings;
   moduleState: EditStoryModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<EditStoryModuleState>>;
 }
 
-const EditStoryModule: React.FC<EditStoryModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
+const EditStoryModule: React.FC<EditStoryModuleProps> = ({ moduleState, setModuleState }) => {
+  const { apiSettings } = useAppContext(); // Use context
   const {
     activeTab,
     // Single Edit
