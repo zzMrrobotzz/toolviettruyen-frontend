@@ -115,7 +115,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const getAvailableAIProviders = useCallback(async (): Promise<string[]> => {
     try {
-      const response = await fetch('/api/ai/providers', {
+      const response = await fetch('/api/providers', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
