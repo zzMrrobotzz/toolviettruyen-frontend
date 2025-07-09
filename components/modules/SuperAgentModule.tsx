@@ -6,7 +6,8 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateImage } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
+import { generateImage } from '../../services/geminiService'; // Keep direct image generation for now
 import { fetchElevenLabsVoices, generateElevenLabsSpeech } from '../../services/elevenLabsService';
 import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
@@ -101,14 +102,26 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
         storyPrompt = `Dựa vào dàn ý sau, hãy viết một câu chuyện hoàn chỉnh khoảng ${wordCount} từ. Chỉ trả về câu chuyện hoàn chỉnh:\n\n${sourceText}`;
       } else {
         setLoadingMessage('Bước 1/4 (P1): Đang tạo dàn ý từ tiêu đề...');
-        const outlineResult = await generateText(`Hãy viết một dàn ý chi tiết cho truyện ngắn với tiêu đề: "${sourceText}".`, undefined, undefined, geminiApiKeyForService);
+        const outlineResult = await generateTextViaBackend({
+          prompt: `Hãy viết một dàn ý chi tiết cho truyện ngắn với tiêu đề: "${sourceText}".`,
+          provider: 'gemini'
+        });
+        if (!outlineResult.success || !outlineResult.text) {
+          throw new Error(outlineResult.error || 'Failed to generate outline via backend.');
+        }
         if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         await delay(1000, abortController.signal); 
         setLoadingMessage('Bước 1/4 (P2): Đang viết truyện từ dàn ý...');
         storyPrompt = `Dựa vào dàn ý sau, hãy viết một câu chuyện hoàn chỉnh khoảng ${wordCount} từ. Chỉ trả về câu chuyện hoàn chỉnh:\n\n${outlineResult.text}`;
       }
       
-      const storyResult = await generateText(storyPrompt, undefined, undefined, geminiApiKeyForService);
+      const storyResult = await generateTextViaBackend({
+        prompt: storyPrompt,
+        provider: 'gemini'
+      });
+      if (!storyResult.success || !storyResult.text) {
+        throw new Error(storyResult.error || 'Failed to generate story via backend.');
+      }
       if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       updateState({ generatedStory: storyResult.text });
       await delay(1000, abortController.signal); 
@@ -116,7 +129,13 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
       setLoadingMessage(`Bước 2/4: Đang tạo ${imageCount} prompt ảnh...`);
       
       const imagePromptsQuery = `Dựa trên câu chuyện sau, hãy tạo ra ${imageCount} prompt ảnh bằng tiếng Anh để minh họa cho các cảnh quan trọng. Mỗi prompt phải chi tiết, sống động, thích hợp cho model text-to-image Imagen3. Mỗi prompt trên một dòng riêng biệt, không có đầu mục "Prompt X:".\n\nTRUYỆN (chỉ dùng phần đầu để tham khảo nếu truyện quá dài):\n${storyResult.text.substring(0, 3000)}`;
-      const imagePromptsResult = await generateText(imagePromptsQuery, undefined, undefined, geminiApiKeyForService);
+      const imagePromptsResult = await generateTextViaBackend({
+        prompt: imagePromptsQuery,
+        provider: 'gemini'
+      });
+      if (!imagePromptsResult.success || !imagePromptsResult.text) {
+        throw new Error(imagePromptsResult.error || 'Failed to generate image prompts via backend.');
+      }
       if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const prompts = imagePromptsResult.text.split('\n').filter(p => p.trim() !== '').slice(0, imageCount);
       await delay(1000, abortController.signal); 

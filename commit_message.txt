@@ -1,5 +1,1 @@
-refactor(modules): Complete migration to AppContext
-
-- Refactored all module components to consume apiSettings and key from AppContext via the useAppContext hook.
-- Removed the redundant passing of apiSettings and key as props from App.tsx to all modules.
-- This ensures a consistent state management pattern and resolves the potential race condition causing the '(void 0) is not a function' TypeError.
+refactor(SuperAgent): Use backend proxy for text generation
