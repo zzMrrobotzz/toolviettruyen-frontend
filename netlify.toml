@@ -1,0 +1,8 @@
+# Netlify configuration file
+# This file configures proxy redirects for the API.
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://key-manager-backend.onrender.com/api/:splat"
+  status = 200
+  force = true
