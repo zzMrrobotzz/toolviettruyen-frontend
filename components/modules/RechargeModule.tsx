@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Card, Button, Row, Col, Typography, Spin, Modal } from 'antd';
 import axios from 'axios';
+import { API_BASE_URL_URL } from '../../config';
 import QRCodeWrapper from './QRCodeWrapper';
-
-const API_BASE = "https://key-manager-backend.onrender.com/api";
 
 const PRICING = [
   { label: '100 bài viết', credit: 100, price: 500000 },
@@ -23,7 +22,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
     if (!currentKey) return;
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/validate`, { key: currentKey });
+      const res = await axios.post(`${API_BASE_URL}/keys/validate`, { key: currentKey });
       setCredit(res.data?.keyInfo?.credit ?? 0);
     } catch (err) {
       setModal({ open: true, title: 'Lỗi', content: 'Không lấy được số credit!' });
@@ -44,7 +43,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
     }
     setPaying(true);
     try {
-      const res = await axios.post(`${API_BASE}/payment/create`, { key: currentKey, credit: creditAmount });
+      const res = await axios.post(`${API_BASE_URL}/payment/create`, { key: currentKey, credit: creditAmount });
       if (res.data?.payUrl) {
         setModal({
           open: true,

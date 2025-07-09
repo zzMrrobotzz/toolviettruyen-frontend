@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { ApiSettings, ElevenLabsApiKey, ElevenLabsVoice, SuperAgentModuleState } from '../../types'; // Character import removed
+import { ApiSettings, ElevenLabsApiKey, ElevenLabsVoice, SuperAgentModuleState } from '../../types';
 import { ASPECT_RATIO_OPTIONS, SUPER_AGENT_WORD_COUNT_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
@@ -8,7 +8,7 @@ import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateText, generateImage } from '../../services/geminiService';
 import { fetchElevenLabsVoices, generateElevenLabsSpeech } from '../../services/elevenLabsService';
-import { delay } from '../../utils'; // Added delay import
+import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
 
 interface SuperAgentModuleProps {
@@ -21,7 +21,7 @@ interface SuperAgentModuleProps {
 const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({ 
   elevenLabsApiKeys, setElevenLabsApiKeys, moduleState, setModuleState 
 }) => {
-  const { apiSettings } = useAppContext(); // Use context to get apiSettings
+  const { apiSettings } = useAppContext();
   const {
     sourceText, wordCount, imageCount, aspectRatio,
     selectedTtsApiKey, availableVoices, selectedTtsVoiceId,

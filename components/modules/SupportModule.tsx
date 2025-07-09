@@ -3,12 +3,13 @@ import ModuleContainer from '../ModuleContainer';
 import InfoBox from '../InfoBox';
 import axios from 'axios';
 
+import { API_BASE_URL } from '../../config';
+
 interface SupportModuleProps {
-  apiSettings: { apiBase: string };
   currentKey: string;
 }
 
-const SupportModule: React.FC<SupportModuleProps> = ({ apiSettings, currentKey }) => {
+const SupportModule: React.FC<SupportModuleProps> = ({ currentKey }) => {
   const [credit, setCredit] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +19,7 @@ const SupportModule: React.FC<SupportModuleProps> = ({ apiSettings, currentKey }
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.post(`${apiSettings.apiBase}/validate`, { key: currentKey });
+      const res = await axios.post(`${API_BASE_URL}/keys/validate`, { key: currentKey });
       setCredit(res.data?.keyInfo?.credit ?? 0);
     } catch (err) {
       setError('Không lấy được số credit!');

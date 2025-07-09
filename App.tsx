@@ -1,19 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from './AppContext';
+import KeyValidationModal from './components/KeyValidationModal';
+import LoadingSpinner from './components/LoadingSpinner';
 import {
   ActiveModule, ElevenLabsApiKey, ApiSettings, ApiProvider,
   SuperAgentModuleState, CreativeLabModuleState, 
   WriteStoryModuleState, RewriteModuleState, AnalysisModuleState, TtsModuleState,
-  YoutubeSeoModuleState, /* ImageByHookModuleState, */ // Removed
-  ViralTitleGeneratorModuleState, ElevenLabsVoice, /* ImageByHookEngine, */ // Removed
-  /* BatchImageGeneratorModuleState, */ // Removed
-  ImageGenerationSuiteModuleState, ImageGenerationEngine, GeneratedImageItem, // BatchOutlineItem removed from here as it's not directly used by App
-  EditStoryModuleState, EditStoryAnalysisReport, BatchStoryWritingModuleState, BatchStoryInputItem,
-  BatchRewriteModuleState, BatchRewriteInputItem, EditStoryActiveTab, BatchEditStoryInputItem, // Added BatchRewrite types
-  NicheThemeExplorerModuleState, NicheThemeAnalysisResult, // Added for Niche Theme Explorer
-  Dream100CompetitorAnalysisModuleState, Dream100ChannelResult, GroundingChunk, // Added for Dream 100
-  CharacterStudioModuleState, // Added for Character Studio
-  GeminiSubPromptsResponse, // Added for ImageGenerationSuite
-  // SupportModuleState is not strictly needed for a static display, but can be added if it evolves
+  YoutubeSeoModuleState,
+  ViralTitleGeneratorModuleState, ElevenLabsVoice,
+  ImageGenerationSuiteModuleState, ImageGenerationEngine, GeneratedImageItem,
+  EditStoryModuleState, BatchStoryWritingModuleState,
+  BatchRewriteModuleState,
+  NicheThemeExplorerModuleState,
+  Dream100CompetitorAnalysisModuleState,
+  CharacterStudioModuleState,
+  GeminiSubPromptsResponse
 } from './types';
 import { 
     NAVIGATION_ITEMS, DEFAULT_API_PROVIDER, HOOK_LANGUAGE_OPTIONS, 
@@ -22,7 +23,7 @@ import {
     OUTLINE_DETAIL_LEVEL_OPTIONS, STABILITY_STYLE_PRESETS, IMAGE_GENERATION_ENGINE_OPTIONS, 
     HOOK_STYLE_OPTIONS, HOOK_LENGTH_OPTIONS, STORY_LENGTH_OPTIONS,
     LESSON_LENGTH_OPTIONS, LESSON_WRITING_STYLE_OPTIONS, PREDEFINED_ART_STYLES,
-    HOOK_STRUCTURE_OPTIONS, VARIATION_GOAL_OPTIONS // Added VARIATION_GOAL_OPTIONS
+    HOOK_STRUCTURE_OPTIONS, VARIATION_GOAL_OPTIONS
 } from './constants';
 import Sidebar from './components/Sidebar';
 import MainHeader from './components/MainHeader';
@@ -34,33 +35,19 @@ import RewriteModule from './components/modules/RewriteModule';
 import AnalysisModule from './components/modules/AnalysisModule';
 import TtsModule from './components/modules/TtsModule';
 import YoutubeSeoModule from './components/modules/YoutubeSeoModule';
-// import ImageByHookModule from './components/modules/ImageByHookModule'; // Removed
 import ViralTitleGeneratorModule from './components/modules/ViralTitleGeneratorModule';
-// import BatchImageGeneratorModule from './components/modules/BatchImageGeneratorModule'; // Removed
 import ImageGenerationSuiteModule from './components/modules/ImageGenerationSuiteModule';
-import EditStoryModule from './components/modules/EditStoryModule'; // Added
-import BatchStoryWritingModule from './components/modules/BatchStoryWritingModule'; // Added
-import BatchRewriteModule from './components/modules/BatchRewriteModule'; // Added
+import EditStoryModule from './components/modules/EditStoryModule';
+import BatchStoryWritingModule from './components/modules/BatchStoryWritingModule';
+import BatchRewriteModule from './components/modules/BatchRewriteModule';
 import NicheThemeExplorerModule from './components/modules/NicheThemeExplorerModule';
-import Dream100CompetitorAnalysisModule from './components/modules/Dream100CompetitorAnalysisModule'; // Added
-import CharacterStudioModule from './components/modules/CharacterStudioModule'; // Added
-import SupportModule from './components/modules/SupportModule'; // Added
-import RechargeModule from './components/modules/RechargeModule'; // Đã thêm đúng
-import axios from "axios";
-import { useAppContext } from './AppContext';
-
-// API base URL
-const API_BASE = "https://key-manager-backend.onrender.com/api";
-
-// Define a default, empty API settings object that matches the type
-const defaultApiSettings: ApiSettings = {
-  provider: DEFAULT_API_PROVIDER as ApiProvider,
-  apiKey: '',
-  apiBase: API_BASE, // Add the missing apiBase property
-};
+import Dream100CompetitorAnalysisModule from './components/modules/Dream100CompetitorAnalysisModule';
+import CharacterStudioModule from './components/modules/CharacterStudioModule';
+import SupportModule from './components/modules/SupportModule';
+import RechargeModule from './components/modules/RechargeModule';
 
 const App: React.FC = () => {
-  const { apiSettings, setApiSettings, key, setKey } = useAppContext(); // Use context
+  const { keyInfo, isLoading, apiSettings, setApiSettings } = useAppContext();
   const [activeModule, setActiveModule] = useState<ActiveModule>(ActiveModule.SuperAgent);
   const [elevenLabsApiKeys, setElevenLabsApiKeys] = useState<ElevenLabsApiKey[]>(() => {
     const savedKeys = localStorage.getItem('elevenLabsApiKeys');
@@ -85,9 +72,9 @@ const App: React.FC = () => {
     customPlot: '',
     outlineDetailLevel: OUTLINE_DETAIL_LEVEL_OPTIONS[0].value,
     referenceViralOutline: '', 
-    referenceOutlineAnalysisResult: null, // Added
-    isAnalyzingReferenceOutline: false, // Added
-    errorAnalyzingReferenceOutline: null, // Added
+    referenceOutlineAnalysisResult: null,
+    isAnalyzingReferenceOutline: false,
+    errorAnalyzingReferenceOutline: null,
     activeCreativeTab: 'quickOutline',
     quickOutlineTitle: '',
     quickOutlineResult: '',
@@ -106,7 +93,7 @@ const App: React.FC = () => {
     batchOutlineError: null,
     batchOutlineProgressMessage: null,
     batchOutlineLoading: false,
-    batchConcurrencyLimit: 3, // Added
+    batchConcurrencyLimit: 3,
   };
   const [creativeLabState, setCreativeLabState] = useState<CreativeLabModuleState>(initialCreativeLabState);
   
@@ -132,7 +119,7 @@ const App: React.FC = () => {
     hookLength: HOOK_LENGTH_OPTIONS[1].value, 
     hookCount: 3, 
     ctaChannel: '',
-    hookStructure: HOOK_STRUCTURE_OPTIONS[0].value, // Added
+    hookStructure: HOOK_STRUCTURE_OPTIONS[0].value,
     generatedHooks: '', 
     hookError: null,
     hookLoadingMessage: null,
@@ -140,11 +127,10 @@ const App: React.FC = () => {
     lessonTargetLength: LESSON_LENGTH_OPTIONS[1].value,
     lessonWritingStyle: LESSON_WRITING_STYLE_OPTIONS[0].value,
     customLessonWritingStyle: '',
-    ctaChannelForLesson: '', // Added
+    ctaChannelForLesson: '',
     generatedLesson: '',
     lessonError: null,
     lessonLoadingMessage: null,
-    // Batch story fields removed
   };
 
   const [writeStoryState, setWriteStoryState] = useState<WriteStoryModuleState>(initialWriteStoryState);
@@ -175,8 +161,20 @@ const App: React.FC = () => {
   });
 
   const [ttsState, setTtsState] = useState<TtsModuleState>({
-    selectedApiKey: '', voices: [], selectedVoiceId: '', textToSpeak: '', 
-    generatedAudioChunks: [], totalCharsLeft: 0, error: null, loadingMessage: null,
+    selectedProvider: 'elevenlabs',
+    googleCloudApiKey: '',
+    amazonAccessKeyId: '',
+    amazonSecretAccessKey: '',
+    amazonRegion: 'us-east-1',
+    selectedApiKey: '',
+    voices: [],
+    selectedVoiceId: '',
+    textToSpeak: '',
+    generatedAudioChunks: [],
+    totalCharsLeft: 0,
+    error: null,
+    loadingMessage: null,
+    concurrencyLimit: 3,
   });
 
   const initialYoutubeSeoState: YoutubeSeoModuleState = {
@@ -198,7 +196,6 @@ const App: React.FC = () => {
     chapterVideoDuration: 10,
     desiredChapterCount: 5,
     generatedChapters: '',
-    // New fields for Title & Thumbnail Optimizer
     titleForAnalysis: '',
     titleAnalysisScore: null,
     titleAnalysisFeedback: null,
@@ -274,7 +271,7 @@ const App: React.FC = () => {
   const [imageGenerationSuiteState, setImageGenerationSuiteState] = useState<ImageGenerationSuiteModuleState>(initialImageGenerationSuiteState);
 
   const initialEditStoryState: EditStoryModuleState = {
-    activeTab: 'single', // Default to single edit tab
+    activeTab: 'single',
     originalStoryToEdit: '',
     outlineForEditing: '',
     targetLengthForEditing: STORY_LENGTH_OPTIONS[1].value, 
@@ -284,11 +281,9 @@ const App: React.FC = () => {
     loadingMessageEditing: null,
     errorEditing: null,
     postEditAnalysis: null,
-    // New fields for interactive refinement
     refinementInstruction: '',
     isRefiningFurther: false,
     furtherRefinementError: null,
-    // Batch edit fields
     batchInputItems: [{ id: Date.now().toString(), originalStory: '', outline: null, specificTargetLength: null, specificLanguage: null }],
     batchResults: [],
     isProcessingBatchEdit: false,
@@ -325,7 +320,7 @@ const App: React.FC = () => {
     isProcessingBatch: false,
     batchProgressMessage: null,
     batchError: null,
-    concurrencyLimit: 3, // Added
+    concurrencyLimit: 3,
   };
   const [batchRewriteState, setBatchRewriteState] = useState<BatchRewriteModuleState>(initialBatchRewriteState);
 
@@ -359,23 +354,19 @@ const App: React.FC = () => {
   const initialCharacterStudioState: CharacterStudioModuleState = {
     characterName: '',
     characterAge: '',
-    characterGender: '', // Added
+    characterGender: '',
     characterCountry: '',
     characterProfession: '',
-    characterKeyFeatures: '', // Added
-
+    characterKeyFeatures: '',
     inputLanguage: HOOK_LANGUAGE_OPTIONS[0].value, 
     outputLanguage: HOOK_LANGUAGE_OPTIONS[1].value, 
-    
     generatedBaseCharacterPrompt: '',
     isLoadingBasePrompt: false,
     errorBasePrompt: null,
     progressMessageBasePrompt: null,
-
-    refinementInstructionForBasePrompt: '', // Added
-    isLoadingRefinementForBasePrompt: false, // Added
-    errorRefinementForBasePrompt: null, // Added
-    
+    refinementInstructionForBasePrompt: '',
+    isLoadingRefinementForBasePrompt: false,
+    errorRefinementForBasePrompt: null,
     characterAction: '',
     generatedCompleteImagePrompt: '',
     isLoadingCompletePrompt: false,
@@ -384,57 +375,25 @@ const App: React.FC = () => {
   };
   const [characterStudioState, setCharacterStudioState] = useState<CharacterStudioModuleState>(initialCharacterStudioState);
 
-  const [isValid, setIsValid] = useState<boolean>(!!key);
-  const [inputKey, setInputKey] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  const [keyInfo, setKeyInfo] = useState<any>(null);
-
-  // Hàm xác thực key
-  const handleValidateKey = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await axios.post(`${API_BASE}/keys/validate`, { key: inputKey });
-      if (res.data.valid) {
-        setKey(inputKey);
-        setIsValid(true);
-        setKeyInfo(res.data.keyInfo);
-        localStorage.setItem("license_key", inputKey);
-        localStorage.setItem("license_key_info", JSON.stringify(res.data.keyInfo));
-      } else {
-        setError("Key không hợp lệ hoặc đã bị thu hồi!");
-      }
-    } catch (err) {
-      setError("Không kết nối được tới server!");
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
     localStorage.setItem('elevenLabsApiKeys', JSON.stringify(elevenLabsApiKeys));
   }, [elevenLabsApiKeys]);
 
   useEffect(() => {
     const stateToSave: Partial<WriteStoryModuleState> = { ...writeStoryState };
-    // Remove output fields before saving to localStorage
     delete stateToSave.generatedStory;
     delete stateToSave.generatedHooks;
     delete stateToSave.generatedLesson;
-    // storyInputForHook, storyInputForLesson, hookStructure, ctaChannelForLesson are inputs/settings, so they should persist.
     delete stateToSave.storyLoadingMessage;
     delete stateToSave.storyProgress;
     delete stateToSave.singleStoryEditProgress;
     delete stateToSave.hookLoadingMessage;
     delete stateToSave.lessonLoadingMessage;
-    // deleted batch story fields
-
     localStorage.setItem('writeStoryModuleState_v1', JSON.stringify(stateToSave));
   }, [writeStoryState]);
 
   useEffect(() => {
     const stateToSave: Partial<RewriteModuleState> = { ...rewriteState };
-    // Remove output fields and session-specific edit statuses/messages before saving
     delete stateToSave.singleRewrittenText;
     delete stateToSave.singleLoadingMessage;
     delete stateToSave.singleProgress;
@@ -442,7 +401,6 @@ const App: React.FC = () => {
     delete stateToSave.singleRewriteEditError;
     delete stateToSave.singleRewriteEditLoadingMessage;
     delete stateToSave.hasSingleRewriteBeenEdited;
-    
     localStorage.setItem('rewriteModuleState_v1', JSON.stringify(stateToSave));
   }, [rewriteState]);
 
@@ -461,27 +419,19 @@ const App: React.FC = () => {
     delete stateToSave.isProcessingBatch;
     delete stateToSave.batchProgressMessage;
     delete stateToSave.batchError;
-    // Input items are settings, so they can be saved
-    // delete stateToSave.inputItems; // No, keep input items
     localStorage.setItem('batchRewriteModuleState_v1', JSON.stringify(stateToSave));
   }, [batchRewriteState]);
 
   useEffect(() => {
     const stateToSave: Partial<EditStoryModuleState> = { ...editStoryState };
-    // Persist activeTab, inputs for single and batch, and global settings for single edit
-    // Clear outputs and processing states
     delete stateToSave.editedStoryOutput;
     delete stateToSave.postEditAnalysis;
     delete stateToSave.isLoadingEditing;
     delete stateToSave.loadingMessageEditing;
     delete stateToSave.errorEditing;
-    // Clear refinement specific states not to be persisted
     delete stateToSave.isRefiningFurther;
     delete stateToSave.furtherRefinementError;
-    // refinementInstruction is an input, so it can be persisted if desired, or cleared here.
-    // For now, let's clear it for a fresh start each time.
     delete stateToSave.refinementInstruction;
-    
     delete stateToSave.batchResults;
     delete stateToSave.isProcessingBatchEdit;
     delete stateToSave.batchEditProgressMessage;
@@ -491,12 +441,10 @@ const App: React.FC = () => {
   
   useEffect(() => {
     const stateToSave: Partial<CreativeLabModuleState> = { ...creativeLabState };
-    // Clear outputs
     delete stateToSave.quickOutlineResult;
     delete stateToSave.finalOutline;
     delete stateToSave.generatedBatchOutlines;
     delete stateToSave.referenceOutlineAnalysisResult;
-    // Clear loading/error states
     delete stateToSave.quickOutlineLoading;
     delete stateToSave.singleOutlineLoading;
     delete stateToSave.batchOutlineLoading;
@@ -508,24 +456,20 @@ const App: React.FC = () => {
     delete stateToSave.quickOutlineProgressMessage;
     delete stateToSave.singleOutlineProgressMessage;
     delete stateToSave.batchOutlineProgressMessage;
-    
     localStorage.setItem('creativeLabModuleState_v1', JSON.stringify(stateToSave));
   }, [creativeLabState]);
 
   useEffect(() => {
     const stateToSave: Partial<YoutubeSeoModuleState> = { ...youtubeSeoState };
-    // Clear output fields for each tab
     delete stateToSave.youtubeDescription;
     delete stateToSave.youtubeTags;
     delete stateToSave.suggestedKeywordsOutput;
     delete stateToSave.generatedChapters;
-    delete stateToSave.currentResult; // General output field
-    // Clear new title optimizer output fields
+    delete stateToSave.currentResult;
     delete stateToSave.titleAnalysisScore;
     delete stateToSave.titleAnalysisFeedback;
     delete stateToSave.suggestedTitles;
     delete stateToSave.thumbnailTextSuggestions;
-    // Clear loading/error states
     delete stateToSave.loadingMessage;
     delete stateToSave.error;
     delete stateToSave.loadingTitleOptimizer;
@@ -549,31 +493,21 @@ const App: React.FC = () => {
     delete stateToSave.error;
     delete stateToSave.progressMessage;
     delete stateToSave.groundingSources;
-    // Settings fields like inputChannelUrl, numberOfSuggestions, outputLanguage,
-    // and the new filter preferences (searchForNewChannels, newChannelTimeframe, viewProfile)
-    // should be persisted if that's the desired behavior.
-    // If they should reset on reload, add them to delete list here.
-    // For now, assuming they are settings and should be saved.
     localStorage.setItem('dream100CompetitorAnalysisModuleState_v1', JSON.stringify(stateToSave));
   }, [dream100State]);
 
   useEffect(() => {
     const stateToSave: Partial<CharacterStudioModuleState> = { ...characterStudioState };
-    // Clear all output and processing-related fields
     delete stateToSave.generatedBaseCharacterPrompt;
     delete stateToSave.isLoadingBasePrompt;
     delete stateToSave.errorBasePrompt;
     delete stateToSave.progressMessageBasePrompt;
-    
-    delete stateToSave.isLoadingRefinementForBasePrompt; // Added
-    delete stateToSave.errorRefinementForBasePrompt; // Added
-    // refinementInstructionForBasePrompt is an input, so it can persist
-
+    delete stateToSave.isLoadingRefinementForBasePrompt;
+    delete stateToSave.errorRefinementForBasePrompt;
     delete stateToSave.generatedCompleteImagePrompt;
     delete stateToSave.isLoadingCompletePrompt;
     delete stateToSave.errorCompletePrompt;
     delete stateToSave.progressMessageCompletePrompt;
-    
     localStorage.setItem('characterStudioModuleState_v1', JSON.stringify(stateToSave));
   }, [characterStudioState]);
 
@@ -599,14 +533,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const stateToSave: Partial<ViralTitleGeneratorModuleState> = {...viralTitleGeneratorState};
-    // Reset output fields
     delete stateToSave.resultText;
     delete stateToSave.analysisReport;
     delete stateToSave.viralFormulas;
     delete stateToSave.applicationSuggestions;
     delete stateToSave.groundingSourcesAnalysis;
     delete stateToSave.generateVariationsExplanation;
-    // Reset loading/error messages
     delete stateToSave.loadingMessage;
     delete stateToSave.error;
     delete stateToSave.analyzeLoadingMessage;
@@ -618,8 +550,6 @@ const App: React.FC = () => {
   useEffect(() => {
      if(outlineForSuperAgent){
         setSuperAgentState(prev => ({...prev, sourceText: outlineForSuperAgent}));
-        // Optional: clear it after transferring if it's a one-time transfer
-        // setOutlineForSuperAgent(''); 
      }
   }, [outlineForSuperAgent]);
 
@@ -638,48 +568,21 @@ const App: React.FC = () => {
         generatedHooks: '', 
         hookError: null,
         hookLoadingMessage: null,
-        // storyInputForHook: '', // Do not clear storyInputForHook here, let user manage it
       }));
-      // Also update EditStoryModule if it's the active one and its single edit outline is empty
-       if (activeModule === ActiveModule.EditStory && !editStoryState.originalStoryToEdit) { // Check if story is empty before filling outline
+       if (activeModule === ActiveModule.EditStory && !editStoryState.originalStoryToEdit) {
             setEditStoryState(prevEdit => ({
                 ...prevEdit,
                 outlineForEditing: storyOutlineForWriteModule,
-                activeTab: 'single' // Default to single tab when outline is passed
+                activeTab: 'single'
             }));
         }
     }
   }, [storyOutlineForWriteModule, activeModule, editStoryState.originalStoryToEdit]);
 
-  useEffect(() => {
-    const savedKey = localStorage.getItem("license_key");
-    if (savedKey) {
-      axios.post(`${API_BASE}/keys/validate`, { key: savedKey }).then(res => {
-        if (res.data.valid) {
-          setIsValid(true);
-          setKey(savedKey);
-          setKeyInfo(res.data.keyInfo);
-          localStorage.setItem("license_key_info", JSON.stringify(res.data.keyInfo));
-        } else {
-          setIsValid(false);
-          setKey("");
-          setKeyInfo(null);
-          localStorage.removeItem("license_key");
-          localStorage.removeItem("license_key_info");
-        }
-      }).catch(() => {
-        setIsValid(false);
-        setKey("");
-        setKeyInfo(null);
-      });
-    }
-  }, []);
-
   const renderActiveModule = () => {
     switch (activeModule) {
       case ActiveModule.SuperAgent:
         return <SuperAgentModule 
-                  apiSettings={apiSettings} 
                   elevenLabsApiKeys={elevenLabsApiKeys}
                   setElevenLabsApiKeys={setElevenLabsApiKeys}
                   moduleState={superAgentState}
@@ -687,63 +590,50 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.CreativeLab:
         return <CreativeLabModule 
-                  apiSettings={apiSettings} 
                   setActiveModule={setActiveModule}
                   setStoryOutlineForWriteModule={setStoryOutlineForWriteModule} 
-                  // onSendBatchOutlinesToStoryModule removed
                   setOutlineForSuperAgent={setOutlineForSuperAgent}
                   moduleState={creativeLabState}
                   setModuleState={setCreativeLabState}
                 />;
       case ActiveModule.WriteStory:
         return <WriteStoryModule 
-                  apiSettings={apiSettings}
                   moduleState={writeStoryState}
                   setModuleState={setWriteStoryState}
                   retrievedViralOutlineFromAnalysis={analysisState.viralOutlineAnalysisResult}
-                  currentKey={key}
                 />;
-      case ActiveModule.BatchStoryWriting: // Added
+      case ActiveModule.BatchStoryWriting:
         return <BatchStoryWritingModule 
-                  apiSettings={apiSettings}
                   moduleState={batchStoryWritingState}
                   setModuleState={setBatchStoryWritingState}
-                  currentKey={key}
                 />;
       case ActiveModule.Rewrite:
         return <RewriteModule 
-                  apiSettings={apiSettings} 
                   moduleState={rewriteState}
                   setModuleState={setRewriteState}
                 />;
-      case ActiveModule.BatchRewrite: // Added
+      case ActiveModule.BatchRewrite:
         return <BatchRewriteModule 
-                  apiSettings={apiSettings} 
                   moduleState={batchRewriteState}
                   setModuleState={setBatchRewriteState}
-                  currentKey={key}
                 />;
       case ActiveModule.Analysis:
         return <AnalysisModule 
-                  apiSettings={apiSettings}
                   moduleState={analysisState}
                   setModuleState={setAnalysisState}
                 />;
        case ActiveModule.NicheThemeExplorer:
         return <NicheThemeExplorerModule 
-                  apiSettings={apiSettings}
                   moduleState={nicheThemeExplorerState}
                   setModuleState={setNicheThemeExplorerState}
                 />;
-       case ActiveModule.Dream100CompetitorAnalysis: // Added
+       case ActiveModule.Dream100CompetitorAnalysis:
         return <Dream100CompetitorAnalysisModule
-                  apiSettings={apiSettings}
                   moduleState={dream100State}
                   setModuleState={setDream100State}
                 />;
       case ActiveModule.TTS:
         return <TtsModule 
-                  apiSettings={apiSettings}
                   elevenLabsApiKeys={elevenLabsApiKeys} 
                   setElevenLabsApiKeys={setElevenLabsApiKeys}
                   moduleState={ttsState}
@@ -751,61 +641,48 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.YouTubeSEO:
         return <YoutubeSeoModule 
-                  apiSettings={apiSettings}
                   moduleState={youtubeSeoState}
                   setModuleState={setYoutubeSeoState}
                 />;
       case ActiveModule.ViralTitleGenerator:
         return <ViralTitleGeneratorModule 
-                  apiSettings={apiSettings}
                   moduleState={viralTitleGeneratorState}
                   setModuleState={setViralTitleGeneratorState}
                  />;
       case ActiveModule.ImageGenerationSuite: 
         return <ImageGenerationSuiteModule 
-                  apiSettings={apiSettings} 
                   moduleState={imageGenerationSuiteState}
                   setModuleState={setImageGenerationSuiteState}
                 />;
-      case ActiveModule.CharacterStudio: // Added
+      case ActiveModule.CharacterStudio:
         return <CharacterStudioModule
-                  apiSettings={apiSettings}
                   moduleState={characterStudioState}
                   setModuleState={setCharacterStudioState}
                 />;
       case ActiveModule.EditStory:
         return <EditStoryModule
-                  apiSettings={apiSettings}
                   moduleState={editStoryState}
                   setModuleState={setEditStoryState}
                 />;
       case ActiveModule.Support: 
-        return <SupportModule apiSettings={apiSettings} currentKey={key} />;
+        return <SupportModule />;
       case ActiveModule.Recharge:
-        return <RechargeModule currentKey={key} />;
+        return <RechargeModule />;
       default:
-        return <div className="p-6 text-center text-gray-600">Chọn một module từ thanh bên để bắt đầu.</div>;
+        return <div className="p-6 text-center text-gray-600">Chọn một module từ thanh bên ��ể bắt đầu.</div>;
     }
   };
 
-  // Nếu chưa xác thực key, chỉ hiện form nhập key
-  if (!isValid) {
+  if (isLoading) {
     return (
-      <div style={{ maxWidth: 400, margin: "100px auto", textAlign: "center" }}>
-        <h2>Nhập Key Bản Quyền</h2>
-        <input
-          value={inputKey}
-          onChange={(e) => setInputKey(e.target.value)}
-          placeholder="Nhập key..."
-          style={{ width: "100%", padding: 8, marginBottom: 10 }}
-        />
-        <br />
-        <button onClick={handleValidateKey} disabled={loading || !inputKey}>
-          {loading ? "Đang kiểm tra..." : "Xác thực key"}
-        </button>
-        {error && <div style={{ color: "red", marginTop: 10 }}>{error}</div>}
+      <div className="flex min-h-screen bg-gradient-to-br from-slate-900 to-gray-800 items-center justify-center">
+        <LoadingSpinner />
       </div>
     );
+  }
+
+  if (!keyInfo) {
+    return <KeyValidationModal />;
   }
 
   return (
@@ -813,8 +690,6 @@ const App: React.FC = () => {
       <Sidebar 
         activeModule={activeModule} 
         setActiveModule={setActiveModule} 
-        apiSettings={apiSettings}
-        currentKey={key}
       />
       <main className="flex-1 ml-64 p-3 md:p-6 bg-gray-100 rounded-l-3xl shadow-2xl overflow-y-auto">
         <div className="bg-white shadow-xl rounded-2xl min-h-full flex flex-col">
@@ -822,31 +697,6 @@ const App: React.FC = () => {
             <div className="p-4 md:p-8 flex-grow">
                 <ApiSettingsComponent apiSettings={apiSettings} setApiSettings={setApiSettings} />
                 {renderActiveModule()}
-                {keyInfo && (
-                  <div style={{ background: "#f6f6f6", padding: 16, marginBottom: 16, borderRadius: 8 }}>
-                    <b>Thông tin key:</b>
-                    <ul>
-                      <li><b>Key:</b> {keyInfo.key}</li>
-                      <li><b>Ngày tạo:</b> {keyInfo.createdAt ? new Date(keyInfo.createdAt).toLocaleString() : "---"}</li>
-                      <li><b>Ngày hết hạn:</b> {keyInfo.expiredAt ? new Date(keyInfo.expiredAt).toLocaleDateString() : "---"}</li>
-                      <li><b>Số máy tối đa:</b> {keyInfo.maxActivations || 1}</li>
-                      <li><b>Ghi chú:</b> {keyInfo.note || "---"}</li>
-                      <li><b>Trạng thái:</b> {keyInfo.isActive ? "Hoạt động" : "Đã thu hồi"}</li>
-                    </ul>
-                  </div>
-                )}
-                <button
-                  style={{ float: "right", margin: 10 }}
-                  onClick={() => {
-                    setIsValid(false);
-                    setKey("");
-                    setKeyInfo(null); // Use context setter
-                    localStorage.removeItem("license_key");
-                    localStorage.removeItem("license_key_info");
-                  }}
-                >
-                  Đăng xuất / Đổi key
-                </button>
             </div>
             <footer className="text-center p-6 text-sm text-gray-500 border-t border-gray-200 mt-auto">
                 © {new Date().getFullYear()} AI Story - ALL IN ONE by Đức Đại MMO. Tất cả các quyền được bảo lưu. Liên hệ: <a href="mailto:ducdaimmo.contact@gmail.com" className="text-indigo-600 hover:underline">ducdaimmo.contact@gmail.com</a>

@@ -42,7 +42,7 @@ export type ApiProvider = "gemini" | "openai" | "grok" | "deepseek" | "minimax";
 
 export interface ApiSettings {
   provider: ApiProvider;
-  apiKey: string;
+  // apiKey removed - now managed by backend
   apiBase: string;
 }
 
@@ -629,6 +629,20 @@ export interface ThumbnailTextResponse {
 // For ImageGenerationSuiteModule, to parse AI response for sub-prompts
 export interface GeminiSubPromptsResponse {
   image_prompts: string[];
+}
+
+// --- User Authentication & Credit Management ---
+export interface KeyInfo {
+  _id: string;
+  key: string;
+  credit: number;
+  note: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  expiredAt?: string;
+  maxActivations?: number;
+  activations: string[];
 }
 
 // Props for UI Components (Main App)
