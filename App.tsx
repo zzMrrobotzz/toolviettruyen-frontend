@@ -665,9 +665,9 @@ const App: React.FC = () => {
                   setModuleState={setEditStoryState}
                 />;
       case ActiveModule.Support: 
-        return <SupportModule />;
+        return <SupportModule currentKey={keyInfo.key} />;
       case ActiveModule.Recharge:
-        return <RechargeModule />;
+        return <RechargeModule currentKey={keyInfo.key} />;
       default:
         return <div className="p-6 text-center text-gray-600">Chọn một module từ thanh bên ��ể bắt đầu.</div>;
     }

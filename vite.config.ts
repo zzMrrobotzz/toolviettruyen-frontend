@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// A clean Vite configuration, removing all potentially problematic polyfills.
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -9,23 +10,9 @@ export default defineConfig({
     }
   },
   base: './',
-  define: {
-    // Complete browser environment compatibility
-    'process.env.NODE_ENV': '"production"',
-    'global': 'globalThis',
-    'process': 'globalThis.process',
-    'require': 'undefined',
-  },
-  resolve: {
-    alias: {
-      // Prevent Node.js modules from causing issues
-      'buffer': 'buffer',
-      'process': 'process/browser',
-    }
-  },
-  optimizeDeps: {
-    include: ['buffer', 'process']
-  },
+  // All custom 'define', 'resolve.alias', and 'optimizeDeps' have been removed.
+  // If the build fails with a specific error like "process is not defined",
+  // we will add back the necessary polyfills in a safer way.
   build: {
     sourcemap: false,
     target: 'es2015',
