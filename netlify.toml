@@ -1,5 +1,10 @@
 # Netlify configuration file
-# This file configures proxy redirects for the API.
+# This file configures proxy redirects for the API and build settings for keyadmin.
+
+[build]
+  base = "keyadmin"
+  command = "npm install && npm run build"
+  publish = "keyadmin/build"
 
 [[redirects]]
   from = "/api/*"
