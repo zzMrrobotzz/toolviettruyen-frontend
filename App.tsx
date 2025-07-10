@@ -161,20 +161,12 @@ const App: React.FC = () => {
   });
 
   const [ttsState, setTtsState] = useState<TtsModuleState>({
-    selectedProvider: 'elevenlabs',
-    googleCloudApiKey: '',
-    amazonAccessKeyId: '',
-    amazonSecretAccessKey: '',
-    amazonRegion: 'us-east-1',
-    selectedApiKey: '',
-    voices: [],
-    selectedVoiceId: '',
+    selectedTtsApiKey: '',
+    availableVoices: [],
+    selectedTtsVoiceId: '',
     textToSpeak: '',
-    generatedAudioChunks: [],
-    totalCharsLeft: 0,
     error: null,
     loadingMessage: null,
-    concurrencyLimit: 3,
   });
 
   const initialYoutubeSeoState: YoutubeSeoModuleState = {
@@ -581,10 +573,8 @@ const App: React.FC = () => {
 
   const renderActiveModule = () => {
     switch (activeModule) {
-      case ActiveModule.SuperAgent:
+            case ActiveModule.SuperAgent:
         return <SuperAgentModule 
-                  elevenLabsApiKeys={elevenLabsApiKeys}
-                  setElevenLabsApiKeys={setElevenLabsApiKeys}
                   moduleState={superAgentState}
                   setModuleState={setSuperAgentState}
                 />;
@@ -634,8 +624,6 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.TTS:
         return <TtsModule 
-                  elevenLabsApiKeys={elevenLabsApiKeys} 
-                  setElevenLabsApiKeys={setElevenLabsApiKeys}
                   moduleState={ttsState}
                   setModuleState={setTtsState}
                 />;
@@ -695,7 +683,7 @@ const App: React.FC = () => {
         <div className="bg-white shadow-xl rounded-2xl min-h-full flex flex-col">
             <MainHeader />
             <div className="p-4 md:p-8 flex-grow">
-                <ApiSettingsComponent apiSettings={apiSettings} setApiSettings={setApiSettings} />
+                <ApiSettingsComponent />
                 {renderActiveModule()}
             </div>
             <footer className="text-center p-6 text-sm text-gray-500 border-t border-gray-200 mt-auto">
