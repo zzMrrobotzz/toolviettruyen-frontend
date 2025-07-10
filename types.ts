@@ -54,6 +54,31 @@ export interface GeminiGenerateImageResponse {
   base64Image: string;
 }
 
+export interface AIRequest {
+  prompt: string;
+  systemInstruction?: string;
+  provider: 'gemini' | 'openai' | 'deepseek';
+  model?: string;
+  useGrounding?: boolean; // Changed from useGoogleSearch to match error
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    topP?: number;
+  };
+}
+
+export interface AIResponse {
+  success: boolean;
+  text?: string;
+  error?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  groundingChunks?: GroundingChunk[]; // Added to match error
+}
+
 export interface GroundingChunk {
   web?: {
     uri: string;

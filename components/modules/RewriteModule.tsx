@@ -9,7 +9,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils'; // Added delay import
 import { useAppContext } from '../../AppContext';
 
@@ -19,7 +19,7 @@ interface RewriteModuleProps {
 }
 
 const RewriteModule: React.FC<RewriteModuleProps> = ({ moduleState, setModuleState }) => {
-  const { apiSettings } = useAppContext(); // Use context
+  const { consumeCredit } = useAppContext(); // Use context
   const {
     // Common
     rewriteLevel, sourceLanguage, targetLanguage, rewriteStyle, customRewriteStyle, adaptContext,
@@ -169,7 +169,16 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
       \n**Perform the rewrite for THIS CHUNK ONLY in ${selectedTargetLangLabel}. Adhere strictly to all instructions. Remember, ONLY the rewritten story text.**`;
       
       if (i > 0) await delay(750); // Delay between chunk rewrites
-      const result = await generateText(prompt, systemInstructionForRewrite);
+      const result = await generateTextViaBackend({
+        prompt,
+        provider: 'gemini',
+        systemInstruction: systemInstructionForRewrite,
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to rewrite text chunk');
+      }
+      
       let partResultText = result.text || ""; 
 
       if (i === 0 && currentRewriteLevel >= 75) {
@@ -198,6 +207,16 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
   const handleSingleRewrite = async () => {
     if (!singleOriginalText.trim()) {
       updateState({ singleError: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
+      return;
+    }
+    
+    // Estimate credits needed based on text length
+    const textLength = singleOriginalText.length;
+    const estimatedCredits = Math.max(1, Math.ceil(textLength / 2000)); // ~1 credit per 2000 chars
+    
+    const hasCredits = await consumeCredit(estimatedCredits);
+    if (!hasCredits) {
+      updateState({ singleError: `Không đủ credit! Cần ${estimatedCredits} credit để viết lại văn bản này.` });
       return;
     }
     
@@ -299,11 +318,27 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     const systemInstructionForEdit = "You are a meticulous story editor. Your task is to refine and polish a given text, ensuring consistency, logical flow, and improved style, while respecting previous rewrite intentions.";
 
 
+    // Credit check for editing
+    const hasCredits = await consumeCredit(1); // 1 credit for editing
+    if (!hasCredits) {
+      updateState({ singleRewriteEditError: 'Không đủ credit! Cần 1 credit để tinh chỉnh văn bản.', isEditingSingleRewrite: false });
+      return;
+    }
+
     updateState({ isEditingSingleRewrite: true, singleRewriteEditError: null, singleRewriteEditLoadingMessage: 'Đang phân tích và tinh chỉnh logic...', hasSingleRewriteBeenEdited: false });
     
     await delay(1000); // Delay before edit API call
     try {
-      const result = await generateText(editPrompt, systemInstructionForEdit);
+      const result = await generateTextViaBackend({
+        prompt: editPrompt,
+        provider: 'gemini',
+        systemInstruction: systemInstructionForEdit,
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to edit text');
+      }
+      
       updateState({ singleRewrittenText: result.text, isEditingSingleRewrite: false, singleRewriteEditLoadingMessage: 'Tinh chỉnh hoàn tất!', hasSingleRewriteBeenEdited: true });
       setTimeout(() => setModuleState(prev => prev.singleRewriteEditLoadingMessage === 'Tinh chỉnh hoàn tất!' ? {...prev, singleRewriteEditLoadingMessage: null} : prev), 3000);
     } catch (e) {

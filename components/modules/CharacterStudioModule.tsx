@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { 
-    ApiSettings, 
     CharacterStudioModuleState
 } from '../../types';
 import { HOOK_LANGUAGE_OPTIONS } from '../../constants';
@@ -9,7 +8,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { useAppContext } from '../../AppContext';
 
 interface CharacterStudioModuleProps {
@@ -20,7 +19,7 @@ interface CharacterStudioModuleProps {
 const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({ 
     moduleState, setModuleState 
 }) => {
-  const { apiSettings } = useAppContext(); // Use context
+  const { consumeCredit } = useAppContext(); // Use context
   const {
     characterName,
     characterAge,
@@ -52,11 +51,22 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
-  const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
+
 
   const handleGenerateOrRefineBaseCharacterPrompt = async (isRefinement: boolean) => {
     if (!isRefinement && !characterName.trim() && !characterAge.trim() && !characterGender.trim() && !characterCountry.trim() && !characterProfession.trim() && !characterKeyFeatures.trim()) {
       updateState({ errorBasePrompt: 'Vui lòng nhập ít nhất một thông tin cơ bản của nhân vật.' });
+      return;
+    }
+    
+    // Credit check
+    const hasCreditsForRefine = await consumeCredit(1); // 1 credit for character description
+    if (!hasCreditsForRefine) {
+      if (isRefinement) {
+        updateState({ errorRefinementForBasePrompt: 'Không đủ credit! Cần 1 credit để tinh chỉnh mô tả.' });
+      } else {
+        updateState({ errorBasePrompt: 'Không đủ credit! Cần 1 credit để tạo mô tả nhân vật.' });
+      }
       return;
     }
     if (isRefinement && !refinementInstructionForBasePrompt.trim()) {
@@ -143,8 +153,28 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
         `;
     }
     
+    // Credit check
+    const hasCredits = await consumeCredit(1); // 1 credit for character description
+    if (!hasCredits) {
+      if (isRefinement) {
+        updateState({ errorRefinementForBasePrompt: 'Không đủ credit! Cần 1 credit để tinh chỉnh mô tả.' });
+      } else {
+        updateState({ errorBasePrompt: 'Không đủ credit! Cần 1 credit để tạo mô tả nhân vật.' });
+      }
+      return;
+    }
+
     try {
-      const result = await generateText(userPrompt, systemInstruction, undefined, geminiApiKeyForService);
+      const result = await generateTextViaBackend({
+        prompt: userPrompt,
+        provider: 'gemini',
+        systemInstruction: systemInstruction,
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate character description');
+      }
+      
       if (isRefinement) {
           updateState({ 
               generatedBaseCharacterPrompt: result.text.trim(), 
@@ -195,6 +225,14 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
       updateState({ errorCompletePrompt: 'Vui lòng nhập "Mô tả Hành động" của nhân vật.' });
       return;
     }
+
+    // Credit check
+    const hasCredits = await consumeCredit(1); // 1 credit for the final prompt
+    if (!hasCredits) {
+      updateState({ errorCompletePrompt: 'Không đủ credit! Cần 1 credit để tạo prompt hoàn chỉnh.' });
+      return;
+    }
+
     updateState({ 
         isLoadingCompletePrompt: true, 
         errorCompletePrompt: null, 
@@ -225,7 +263,16 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
 `;
 
     try {
-      const result = await generateText(userPrompt, systemInstruction, undefined, geminiApiKeyForService);
+      const result = await generateTextViaBackend({
+        prompt: userPrompt,
+        provider: 'gemini',
+        systemInstruction: systemInstruction,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate complete image prompt');
+      }
+
       updateState({ 
           generatedCompleteImagePrompt: result.text.trim(), 
           isLoadingCompletePrompt: false, 

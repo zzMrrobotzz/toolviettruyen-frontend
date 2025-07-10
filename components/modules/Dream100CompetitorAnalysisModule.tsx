@@ -1,7 +1,6 @@
 
 import React from 'react';
 import {
-    ApiSettings,
     Dream100CompetitorAnalysisModuleState,
     Dream100ChannelResult,
     GroundingChunk
@@ -11,7 +10,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { useAppContext } from '../../AppContext';
 
 interface Dream100CompetitorAnalysisModuleProps {
@@ -22,7 +21,7 @@ interface Dream100CompetitorAnalysisModuleProps {
 const Dream100CompetitorAnalysisModule: React.FC<Dream100CompetitorAnalysisModuleProps> = ({
     moduleState, setModuleState
 }) => {
-  const { apiSettings } = useAppContext(); // Use context
+  const { consumeCredit } = useAppContext(); // Use context
   const {
     inputChannelUrl, numberOfSuggestions, outputLanguage,
     analysisResults, isLoading, error, progressMessage, groundingSources,
@@ -34,8 +33,6 @@ const Dream100CompetitorAnalysisModule: React.FC<Dream100CompetitorAnalysisModul
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
-  const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
-
   const handleAnalyzeCompetitors = async () => {
     if (!inputChannelUrl.trim()) {
       updateState({ error: 'Vui lòng nhập URL kênh YouTube cần phân tích.' });
@@ -46,6 +43,12 @@ const Dream100CompetitorAnalysisModule: React.FC<Dream100CompetitorAnalysisModul
     } catch (e) {
       updateState({ error: 'URL kênh YouTube không hợp lệ.' });
       return;
+    }
+
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+        updateState({ error: 'Không đủ credit để phân tích đối thủ.', isLoading: false });
+        return;
     }
 
     updateState({
@@ -103,7 +106,16 @@ If you cannot find enough distinct similar channels, return as many as you can u
     `;
 
     try {
-      const result = await generateText(prompt, undefined, true, geminiApiKeyForService);
+      const result = await generateTextViaBackend({
+        prompt, 
+        provider: 'gemini',
+        useGrounding: true, // Enable Google Search
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
       let jsonStr = result.text.trim();
       const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
       const match = jsonStr.match(fenceRegex);

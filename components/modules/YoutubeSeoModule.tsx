@@ -37,11 +37,56 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ moduleState, setMod
   };
   
   const getSelectedLanguageLabel = () => HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === language)?.label || language;
-  const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
+  
+  // Helper function for backend text generation
+  const generateTextViaBackendHelper = async (prompt: string, systemInstruction?: string): Promise<string> => {
+    const result = await generateTextViaBackend({
+      prompt,
+      provider: 'gemini',
+      systemInstruction: systemInstruction || 'You are a YouTube SEO expert.',
+    });
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate content');
+    }
+    
+    return result.text;
+  };
+
+  // Helper function for JSON generation via backend
+  const generateJsonViaBackend = async <T,>(prompt: string): Promise<T> => {
+    const result = await generateTextViaBackend({
+      prompt,
+      provider: 'gemini',
+      systemInstruction: 'You are a helpful assistant that returns valid JSON.',
+    });
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate content');
+    }
+    
+    try {
+      return JSON.parse(result.text) as T;
+    } catch (e) {
+      // If parsing fails, try to extract JSON from the response
+      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]) as T;
+      }
+      throw new Error('Invalid JSON response from backend');
+    }
+  };
 
   const handleGenerateDescription = async () => {
     if (!videoTitle.trim()) { updateState({ error: 'Vui lòng nhập tiêu đề video!' }); return; }
     if (!youtubeOutline.trim()) { updateState({ error: 'Vui lòng nhập dàn ý để tạo timeline!' }); return; }
+
+    const hasCredits = await consumeCredit(2);
+    if (!hasCredits) {
+      updateState({ error: 'Không đủ credit! Cần 2 credit để tạo mô tả & timeline.' });
+      return;
+    }
+    
     updateState({ error: null, currentResult: '', youtubeDescription: '', youtubeTags: '', loadingMessage: 'Đang tạo mô tả & timeline theo cấu trúc mới...' });
 
     const selectedLangLabel = getSelectedLanguageLabel(); // e.g., "Tiếng Hàn"
@@ -94,8 +139,8 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
 `;
     
     try {
-      const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
-      let descriptionText = result.text;
+      const resultText = await generateTextViaBackendHelper(prompt, 'You are a YouTube SEO expert and creative writer.');
+      let descriptionText = resultText;
       const tagMatch = descriptionText.match(/\[TAGS\]([\s\S]*?)\[\/TAGS\]/);
       let tagsResult = '';
       if (tagMatch && tagMatch[1]) {
@@ -118,6 +163,13 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
 
   const handleSuggestKeywords = async () => {
     if (!keywordTopic.trim()) { updateState({ error: 'Vui lòng nhập Chủ đề chính của Video.' }); return; }
+
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ error: 'Không đủ credit! Cần 1 credit để tìm từ khóa.' });
+      return;
+    }
+
     updateState({ error: null, currentResult: '', suggestedKeywordsOutput: '', loadingMessage: 'Đang tìm từ khóa liên quan...' });
 
     const selectedLangLabel = getSelectedLanguageLabel();
@@ -126,8 +178,8 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
     Format the output clearly with headings for "Từ khóa Ngắn (Short Keywords):" and "Từ khóa Dài (Long-tail Keywords):". Each keyword on a new line.`;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
-      updateState({ suggestedKeywordsOutput: result.text, currentResult: result.text, loadingMessage: "Tìm từ khóa hoàn tất!" });
+      const resultText = await generateTextViaBackendHelper(prompt);
+      updateState({ suggestedKeywordsOutput: resultText, currentResult: resultText, loadingMessage: "Tìm từ khóa hoàn tất!" });
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tìm từ khóa." }); 
     } finally { 
@@ -143,6 +195,13 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
 
   const handleGenerateChapters = async () => {
     if (!chapterScript.trim()) { updateState({ error: 'Vui lòng nhập Kịch bản Video.' }); return; }
+
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ error: 'Không đủ credit! Cần 1 credit để tạo chapter.' });
+      return;
+    }
+
     updateState({ error: null, currentResult: '', generatedChapters: '', loadingMessage: 'Đang tạo chapter markers...' });
 
     const selectedLangLabel = getSelectedLanguageLabel();
@@ -152,8 +211,8 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
     Distribute the chapters logically throughout the video. Each chapter should be in the format 'HH:MM:SS - Chapter Title in ${selectedLangLabel}' or 'MM:SS - Chapter Title in ${selectedLangLabel}'. Ensure the final chapter does not exceed the total video duration. List each chapter on a new line. Only return the list of chapters.`;
     
     try {
-      const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
-      updateState({ generatedChapters: result.text, currentResult: result.text, loadingMessage: "Tạo chapter hoàn tất!" });
+      const resultText = await generateTextViaBackendHelper(prompt);
+      updateState({ generatedChapters: resultText, currentResult: resultText, loadingMessage: "Tạo chapter hoàn tất!" });
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo chapter." }); 
     } finally { 
@@ -172,6 +231,13 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
       updateState({ errorTitleOptimizer: 'Vui lòng nhập tiêu đề cần phân tích.' });
       return;
     }
+
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ errorTitleOptimizer: 'Không đủ credit! Cần 1 credit để phân tích tiêu đề.' });
+      return;
+    }
+
     updateState({ 
         errorTitleOptimizer: null, 
         loadingTitleOptimizer: true,
@@ -201,7 +267,7 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
         Ensure the JSON is valid. Do not include any text outside this JSON structure.`;
 
     try {
-        const result = await generateTextWithJsonOutput<TitleAnalysisResponse>(prompt, undefined, geminiApiKeyForService);
+        const result = await generateJsonViaBackend<TitleAnalysisResponse>(prompt);
         updateState({
             titleAnalysisScore: result.score,
             titleAnalysisFeedback: result.feedback,
@@ -228,6 +294,12 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
       return;
     }
 
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ errorTitleOptimizer: 'Không đủ credit! Cần 1 credit để gợi ý text thumbnail.' });
+      return;
+    }
+
     updateState({ 
         errorTitleOptimizer: null, 
         loadingTitleOptimizer: true,
@@ -250,7 +322,7 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
         Ensure the JSON is valid. Do not include any text outside this JSON structure.`;
     
     try {
-        const result = await generateTextWithJsonOutput<ThumbnailTextResponse>(prompt, undefined, geminiApiKeyForService);
+        const result = await generateJsonViaBackend<ThumbnailTextResponse>(prompt);
         updateState({
             thumbnailTextSuggestions: result.thumbnail_texts,
             loadingTitleOptimizer: false,
