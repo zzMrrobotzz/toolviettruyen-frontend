@@ -65,8 +65,8 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
       const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
       if (!result.success) throw new Error(result.error || 'AI generation failed');
       const resultText = result.text || '';
-      const factorRegex = /\[FACTOR\](.*?)\|(.*?)\|(.*?)[\]\/FACTOR\]/g;
-      const suggestionRegex = /\[SUGGESTIONS\]([\s\S]*?)[\]\/SUGGESTIONS\]/;
+      const factorRegex = /\[FACTOR\](.*?)\|(.*?)\|(.*?)\[\/FACTOR\]/g;
+      const suggestionRegex = /\[SUGGESTIONS\]([\s\S]*?)\[\/SUGGESTIONS\]/;
       let match;
       const factors: AnalysisFactor[] = [];
       while ((match = factorRegex.exec(resultText)) !== null) {
