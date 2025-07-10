@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { 
-    ApiSettings, 
     NicheThemeExplorerModuleState, 
     NicheThemeAnalysisResult 
 } from '../../types';
@@ -10,7 +9,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextWithJsonOutput } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { useAppContext } from '../../AppContext';
 
 interface NicheThemeExplorerModuleProps {
@@ -21,7 +20,7 @@ interface NicheThemeExplorerModuleProps {
 const NicheThemeExplorerModule: React.FC<NicheThemeExplorerModuleProps> = ({ 
     moduleState, setModuleState 
 }) => {
-  const { apiSettings } = useAppContext(); // Use context
+  const { consumeCredit } = useAppContext(); // Use context
   const {
     inputTitles, inputLanguage, outputLanguage, numNichesToSuggest,
     analysisResults, isLoading, error, progressMessage
@@ -31,13 +30,41 @@ const NicheThemeExplorerModule: React.FC<NicheThemeExplorerModuleProps> = ({
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
-  const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
+  const generateJsonViaBackend = async <T,>(prompt: string): Promise<T> => {
+    const result = await generateTextViaBackend({
+      prompt,
+      provider: 'gemini',
+      systemInstruction: 'You are a helpful assistant that returns valid JSON.',
+    });
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate content');
+    }
+    
+    try {
+      return JSON.parse(result.text) as T;
+    } catch (e) {
+      // If parsing fails, try to extract JSON from the response
+      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]) as T;
+      }
+      throw new Error('Invalid JSON response from backend');
+    }
+  };
 
   const handleAnalyzeAndExploreNiches = async () => {
     if (!inputTitles.trim()) {
       updateState({ error: 'Vui lòng nhập danh sách các tiêu đề video.' });
       return;
     }
+
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ error: 'Không đủ credit để phân tích ngách chủ đề.', isLoading: false });
+      return;
+    }
+
     updateState({ 
         isLoading: true, 
         error: null, 
@@ -79,7 +106,7 @@ Ensure the output is ONLY the JSON array. Do not include any introductory text, 
     `;
 
     try {
-      const resultsArray = await generateTextWithJsonOutput<NicheThemeAnalysisResult[]>(prompt, undefined, geminiApiKeyForService);
+      const resultsArray = await generateJsonViaBackend<NicheThemeAnalysisResult[]>(prompt);
       if (Array.isArray(resultsArray)) {
         updateState({ 
             analysisResults: resultsArray, 
