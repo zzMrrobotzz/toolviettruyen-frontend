@@ -6,7 +6,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateAiContent } from '../../services/keyService'; // SỬA LẠI: Dùng service chính
+import { generateAiContent } from '../../src/services/keyService'; // SỬA LẠI: Dùng service chính
 import { fetchElevenLabsVoices, generateElevenLabsSpeech } from '../../services/elevenLabsService';
 import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';

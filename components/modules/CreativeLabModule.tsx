@@ -8,7 +8,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateAiContent } from '../../services/keyService';
+import { generateAiContent } from '../../src/services/keyService';
 import { useAppContext } from '../../AppContext';
 
 interface CreativeLabModuleProps {
