@@ -1,9 +1,9 @@
-# Netlify configuration for keyadmin
+# Netlify configuration for main frontend app
 # Build settings and API proxy configuration
 
 [build]
   command = "npm install && npm run build"  
-  publish = "build"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "18"
