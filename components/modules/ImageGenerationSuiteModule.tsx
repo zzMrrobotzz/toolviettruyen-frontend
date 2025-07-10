@@ -1,22 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    ApiSettings, 
     ImageGenerationSuiteModuleState, 
-    ImageGenerationEngine, 
     GeneratedImageItem,
     ImageGenerationSuiteActiveTab,
-    GeminiSubPromptsResponse
 } from '../../types';
-import { ASPECT_RATIO_OPTIONS, STABILITY_STYLE_PRESETS, IMAGE_GENERATION_ENGINE_OPTIONS, PREDEFINED_ART_STYLES, HOOK_LANGUAGE_OPTIONS } from '../../constants';
+import { ASPECT_RATIO_OPTIONS, PREDEFINED_ART_STYLES } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextWithJsonOutput, generateImage as generateGeminiImage, generateTextFromImageAndText } from '../../services/geminiService';
-import { generateStabilityImage, refineStabilityImage } from '../../services/stabilityAiService';
-import { generateDallEImage, editDallEImage } from '../../services/openaiService'; 
-import { generateDeepSeekImage, refineDeepSeekImage } from '../../services/deepseekService'; 
-import { delay, dataUrlToBlob } from '../../utils'; 
+import { generateImageViaBackend, generateTextViaBackend } from '../../services/aiProxyService';
+import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
 
 interface ImageGenerationSuiteModuleProps {
@@ -24,78 +18,63 @@ interface ImageGenerationSuiteModuleProps {
   setModuleState: React.Dispatch<React.SetStateAction<ImageGenerationSuiteModuleState>>;
 }
 
-// Helper to convert base64 URL to pure base64 string and mime type
-const parseDataUrl = (dataUrl: string): { base64: string; mimeType: string } | null => {
-    const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-    if (!match) return null;
-    return { mimeType: match[1], base64: match[2] };
-};
-
-
 const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
   moduleState, setModuleState
 }) => {
-  const { apiSettings } = useAppContext(); // Use context
+  const { consumeCredit } = useAppContext();
   const {
-    activeTab, selectedArtStyle, aspectRatio, imageEngine,
-    stabilityApiKey, chatGptApiKey, deepSeekImageApiKey, 
-    stabilityStyle, stabilityNegativePrompt,
+    activeTab, selectedArtStyle, aspectRatio,
     hookText, generatedSingleImages, singleImageOverallError, singleImageProgressMessage,
     promptsInput, generatedBatchImages, batchOverallError, batchProgressMessage,
-    hookTextForCtxPrompts, generatedCtxPrompts, ctxPromptsError, ctxPromptsLoadingMessage, // New state for prompt generator
+    hookTextForCtxPrompts, generatedCtxPrompts, ctxPromptsError, ctxPromptsLoadingMessage,
     settingsError,
-    // Refinement state
-    showRefinementModal, activeRefinementItem, refinementPrompt, isRefining, refinementError
   } = moduleState;
 
   const updateState = (updates: Partial<ImageGenerationSuiteModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
   };
   
-  const [isProcessing, setIsProcessing] = useState(false); 
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const geminiUserApiKey = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
-  const deepseekGeneralApiKey = apiSettings.provider === 'deepseek' ? apiSettings.apiKey : undefined;
-  
   // Cleanup object URLs on unmount or when images change
   useEffect(() => {
-    const allImageUrls = [...generatedSingleImages, ...generatedBatchImages].map(item => item.imageUrl).filter(Boolean) as string[];
+    const allImageUrls = [...generatedSingleImages, ...generatedBatchImages]
+      .map(item => item.imageUrl)
+      .filter(Boolean) as string[];
     return () => {
       allImageUrls.forEach(url => {
         if (url.startsWith('blob:')) {
           URL.revokeObjectURL(url);
         }
       });
-      if (activeRefinementItem?.originalImageDataUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(activeRefinementItem.originalImageDataUrl);
-      }
     };
-  }, [generatedSingleImages, generatedBatchImages, activeRefinementItem]);
+  }, [generatedSingleImages, generatedBatchImages]);
 
   const generateSubPrompts = async (currentHookText: string, isContextual: boolean): Promise<string[]> => {
     const styleInfo = PREDEFINED_ART_STYLES.find(s => s.value === selectedArtStyle);
-    const styleKeywordForSubPromptEng = (styleInfo && styleInfo.value !== 'default') ? styleInfo.value.replace(/_/g, ' ') : null;
+    const styleKeywordForSubPromptEng = (styleInfo && styleInfo.value !== 'default') 
+      ? styleInfo.value.replace(/_/g, ' ') : null;
 
     let contextualizationInstruction = "";
     if (isContextual) {
-        contextualizationInstruction = `
-        **CONTEXTUALIZATION INSTRUCTION (CRITICAL):**
-        1. First, carefully identify the primary language of the "Story Hook / Content" provided below.
-        2. THEN, based on the identified language, apply the following contextualization to the ENGLISH image prompts you generate:
-            - **IF the primary language is Vietnamese (Tiếng Việt):** Generate English image prompts that incorporate elements reflecting Vietnamese culture, settings (e.g., Vietnamese landscapes, traditional houses, bustling city scenes like Hanoi or Saigon with specific landmarks if appropriate), characters (e.g., traditional attire like 'áo dài', 'nón lá' if contextually fitting, or modern Vietnamese fashion), objects, or social customs. The goal is to make the images feel authentic to a Vietnamese setting and narrative.
-            - **IF the primary language is Korean (한국어):** Generate English image prompts that incorporate elements reflecting Korean culture, settings (e.g., Korean cityscapes like Seoul with Namsan Tower, traditional hanok villages, serene temples), characters (e.g., modern K-fashion, K-drama inspired looks, or traditional 'hanbok' if appropriate for the story's period), objects (e.g., specific Korean foods, items from K-dramas), or social customs. The goal is to make the images feel authentic to a Korean setting and narrative.
-            - **IF the primary language is English or any other language not specified above:** Generate general English image prompts without specific cultural contextualization, unless the story content itself strongly implies a specific culture (e.g., a story explicitly set in ancient Rome). In such cases, use the story's implied cultural context.
-        This contextualization should be subtle and natural, fitting the story's narrative and tone. Do not force cultural elements if they feel out of place for the specific scene.`;
+      contextualizationInstruction = `
+      **CONTEXTUALIZATION INSTRUCTION (CRITICAL):**
+      1. First, carefully identify the primary language of the "Story Hook / Content" provided below.
+      2. THEN, based on the identified language, apply the following contextualization to the ENGLISH image prompts you generate:
+          - **IF the primary language is Vietnamese (Tiếng Việt):** Generate English image prompts that incorporate elements reflecting Vietnamese culture, settings, characters, objects, or social customs.
+          - **IF the primary language is Korean (한국어):** Generate English image prompts that incorporate elements reflecting Korean culture, settings, characters, objects, or social customs.
+          - **IF the primary language is English or any other language:** Generate general English image prompts without specific cultural contextualization.
+      This contextualization should be subtle and natural, fitting the story's narrative and tone.`;
     } else {
-        contextualizationInstruction = `
-        **CONTEXTUALIZATION INSTRUCTION:** Generate general English image prompts based on the content.`;
+      contextualizationInstruction = `
+      **CONTEXTUALIZATION INSTRUCTION:** Generate general English image prompts based on the content.`;
     }
     
     let styleInstructionForLLM = "";
     if (styleKeywordForSubPromptEng) {
-        styleInstructionForLLM = `\n**CRITICAL STYLE INSTRUCTION:** For each generated prompt, you MUST incorporate the art style: "${styleKeywordForSubPromptEng}". For example, if the style is "anime style", a prompt might be "A character looking at a sunset, in an anime style".`;
+      styleInstructionForLLM = `\n**CRITICAL STYLE INSTRUCTION:** For each generated prompt, you MUST incorporate the art style: "${styleKeywordForSubPromptEng}". For example, if the style is "anime style", a prompt might be "A character looking at a sunset, in an anime style".`;
     } else {
-        styleInstructionForLLM = `\n**CRITICAL STYLE INSTRUCTION:** The art style is "Mặc định (AI tự quyết)". DO NOT add any specific art style keywords to the prompts; let the image model decide based on the prompt's content.`;
+      styleInstructionForLLM = `\n**CRITICAL STYLE INSTRUCTION:** The art style is "Mặc định (AI tự quyết)". DO NOT add any specific art style keywords to the prompts; let the image model decide based on the prompt's content.`;
     }
 
     const subPromptsGenerationPrompt = `
@@ -112,125 +91,127 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     ${currentHookText}
     ---
 
-    Return your entire response as a single JSON object with a single key "image_prompts".
+    Return your response as a JSON object with a single key "image_prompts".
     The value for "image_prompts" should be an array of strings, where each string is a complete image prompt.
     
-    Example (if style was "vintage photo" and input implied 2 scenes, and input language was Korean):
+    Example:
     {
       "image_prompts": [
-        "A young woman in a modernized hanbok walking through a neon-lit Seoul street at night, reflections in puddles, vintage photo style",
-        "A traditional Korean tea ceremony in a serene hanok courtyard, details of porcelain, vintage photo style"
-      ]
-    }
-    Example (if style was "watercolor painting" and input language was Vietnamese):
-    {
-      "image_prompts": [
-        "A young woman in an ao dai standing by a lotus pond at sunset, serene Vietnamese countryside, watercolor painting style",
-        "A bustling Hoan Kiem Lake scene with a red Huc bridge in the background, watercolor painting style"
-      ]
-    }
-    Example (if style was "photorealistic" and input language was English, non-specific context):
-    {
-      "image_prompts": [
-        "A detective examining clues in a dimly lit, cluttered office, rain streaking down the window, photorealistic style",
-        "A vast, alien desert landscape under a twin-sun sky, a lone rover in the distance, photorealistic style"
+        "A young woman walking through a neon-lit street at night, reflections in puddles, cinematic style",
+        "A serene countryside scene with lotus pond at sunset, watercolor painting style"
       ]
     }
 
-    Do not include any other text or explanation outside this JSON structure. Ensure the output is valid JSON.
-    The number of prompts in the array should reflect the visual storytelling potential of the input. Aim for a reasonable number, e.g., 2-7 prompts.
+    Do not include any other text or explanation outside this JSON structure.
+    The number of prompts in the array should reflect the visual storytelling potential of the input. Aim for 2-7 prompts.
     `;
-    const systemInstructionForSubPrompts = `You are an AI assistant that analyzes text (hooks or stories), identifies key visual scenes, and generates multiple detailed image prompts in English, suitable for AI image generation, formatted as a JSON array. You will apply contextualization and art style instructions as provided.`;
-    
-    const subPromptsResult = await generateTextWithJsonOutput<GeminiSubPromptsResponse>(subPromptsGenerationPrompt, systemInstructionForSubPrompts, geminiUserApiKey);
-    
-    if (!subPromptsResult || !subPromptsResult.image_prompts || subPromptsResult.image_prompts.length === 0) {
+
+    const result = await generateTextViaBackend({
+      prompt: subPromptsGenerationPrompt,
+      provider: 'gemini',
+      systemInstruction: 'You are an AI assistant that analyzes text and generates multiple detailed image prompts in English, formatted as a JSON array.',
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate sub-prompts');
+    }
+
+    try {
+      const jsonResponse = JSON.parse(result.text || '{}');
+      if (!jsonResponse.image_prompts || !Array.isArray(jsonResponse.image_prompts)) {
+        throw new Error('Invalid response format');
+      }
+      return jsonResponse.image_prompts;
+    } catch (e) {
       throw new Error("Không thể tạo danh sách prompt con từ nội dung được cung cấp.");
     }
-    return subPromptsResult.image_prompts;
   };
-
 
   const executeImageGenerationFromHook = async (isContextualImageGeneratorTab: boolean) => {
     if (!hookText.trim()) {
       updateState({ singleImageOverallError: 'Vui lòng nhập đoạn Hook hoặc Nội dung truyện của bạn.' });
       return;
     }
-     if (imageEngine === 'stability' && !stabilityApiKey.trim()) {
-      updateState({ settingsError: 'Vui lòng nhập API Key của Stability AI.', singleImageOverallError: null });
-      return;
-    }
-    if (imageEngine === 'chatgpt' && !chatGptApiKey.trim()) {
-      updateState({ settingsError: 'Vui lòng nhập API Key cho ChatGPT (DALL-E).', singleImageOverallError: null });
-      return;
-    }
-     if (imageEngine === 'deepseek' && !deepSeekImageApiKey.trim() && !deepseekGeneralApiKey) {
-       updateState({ settingsError: 'Vui lòng nhập API Key cho DeepSeek Image hoặc cấu hình trong Cài đặt AI chung nếu dùng chung key.', singleImageOverallError: null });
+
+    // Check and consume credits (estimate 1 credit for prompt generation + 2 per image)
+    const estimatedCost = 3; // Conservative estimate
+    const hasCredits = await consumeCredit(estimatedCost);
+    if (!hasCredits) {
+      updateState({ singleImageOverallError: 'Không đủ credit để tạo ảnh!' });
       return;
     }
 
     updateState({ 
-        generatedSingleImages: [], 
-        singleImageOverallError: null, 
-        singleImageProgressMessage: 'Đang chuẩn bị...', 
-        settingsError: null 
+      generatedSingleImages: [], 
+      singleImageOverallError: null, 
+      singleImageProgressMessage: 'Đang chuẩn bị...', 
+      settingsError: null 
     });
     setIsProcessing(true);
 
     try {
-      updateState({singleImageProgressMessage: `Bước 1: Đang phân tích nội dung và tạo danh sách prompt ảnh ${isContextualImageGeneratorTab ? "(Ngữ cảnh Thông minh)" : ""}...`});
-      await delay(1000); 
+      updateState({
+        singleImageProgressMessage: `Bước 1: Đang phân tích nội dung và tạo danh sách prompt ảnh ${isContextualImageGeneratorTab ? "(Ngữ cảnh Thông minh)" : ""}...`
+      });
+      await delay(1000);
       const subPrompts = await generateSubPrompts(hookText, isContextualImageGeneratorTab);
 
-      const initialImages: GeneratedImageItem[] = subPrompts.map(p => ({ promptUsed: p, imageUrl: null, error: null, engine: imageEngine }));
-      updateState({ generatedSingleImages: initialImages, singleImageProgressMessage: `Đã tạo ${subPrompts.length} prompt con. Bắt đầu tạo ảnh...` });
+      const initialImages: GeneratedImageItem[] = subPrompts.map(p => ({ 
+        promptUsed: p, 
+        imageUrl: null, 
+        error: null, 
+        engine: 'gemini' // Default to gemini for backend
+      }));
+      updateState({ 
+        generatedSingleImages: initialImages, 
+        singleImageProgressMessage: `Đã tạo ${subPrompts.length} prompt con. Bắt đầu tạo ảnh...` 
+      });
 
       const currentGeneratedImages: GeneratedImageItem[] = [...initialImages];
 
       for (let i = 0; i < subPrompts.length; i++) {
         const currentSubPrompt = subPrompts[i];
-        updateState({ singleImageProgressMessage: `Bước ${i + 2}/${subPrompts.length + 1}: Đang tạo ảnh ${i + 1}/${subPrompts.length} (Prompt: ${currentSubPrompt.substring(0,50)}...)` });
-        if (i > 0 || imageEngine === 'google' || imageEngine === 'chatgpt' || imageEngine === 'deepseek') await delay(1500);
+        updateState({ 
+          singleImageProgressMessage: `Bước ${i + 2}/${subPrompts.length + 1}: Đang tạo ảnh ${i + 1}/${subPrompts.length} (Prompt: ${currentSubPrompt.substring(0,50)}...)` 
+        });
+        
+        if (i > 0) await delay(1500);
 
         try {
-          let imageUrlResult: string | null = null;
-          let dalleRevisedPrompt: string | undefined = undefined;
-
-          if (imageEngine === 'google') {
-            const base64Image = await generateGeminiImage(currentSubPrompt, aspectRatio, geminiUserApiKey);
-            imageUrlResult = `data:image/png;base64,${base64Image}`;
-          } else if (imageEngine === 'stability') {
-            if (i === 0) await delay(1000); 
-            const imageBlob = await generateStabilityImage(
-              stabilityApiKey, currentSubPrompt, stabilityStyle, aspectRatio, stabilityNegativePrompt
-            );
-            imageUrlResult = URL.createObjectURL(imageBlob);
-          } else if (imageEngine === 'chatgpt') {
-             const resultDallE = await generateDallEImage(currentSubPrompt, aspectRatio, chatGptApiKey);
-             imageUrlResult = resultDallE;
-          } else if (imageEngine === 'deepseek') {
-            imageUrlResult = await generateDeepSeekImage(currentSubPrompt, aspectRatio, deepSeekImageApiKey, deepseekGeneralApiKey);
+          const imageResult = await generateImageViaBackend(currentSubPrompt, aspectRatio, 'gemini');
+          
+          if (imageResult.success && imageResult.imageData) {
+            const imageUrl = `data:image/png;base64,${imageResult.imageData}`;
+            currentGeneratedImages[i] = { 
+              ...currentGeneratedImages[i], 
+              imageUrl: imageUrl, 
+              error: null 
+            };
+          } else {
+            throw new Error(imageResult.error || 'Image generation failed');
           }
-          currentGeneratedImages[i] = { ...currentGeneratedImages[i], imageUrl: imageUrlResult, error: null, dalleRevisedPrompt: dalleRevisedPrompt };
         } catch (imgErr) {
-          currentGeneratedImages[i] = { ...currentGeneratedImages[i], imageUrl: null, error: `Lỗi ảnh ${i+1}: ${(imgErr as Error).message}` };
+          currentGeneratedImages[i] = { 
+            ...currentGeneratedImages[i], 
+            imageUrl: null, 
+            error: `Lỗi ảnh ${i+1}: ${(imgErr as Error).message}` 
+          };
         }
         updateState({ generatedSingleImages: [...currentGeneratedImages] });
       }
-      updateState({ singleImageProgressMessage: `Hoàn thành tạo ảnh từ hook/truyện${isContextualImageGeneratorTab ? " (Ngữ cảnh Thông minh)" : ""}!`});
+      updateState({ 
+        singleImageProgressMessage: `Hoàn thành tạo ảnh từ hook/truyện${isContextualImageGeneratorTab ? " (Ngữ cảnh Thông minh)" : ""}!`
+      });
 
     } catch (e) {
-      let errorMessage = `Đã xảy ra lỗi: ${(e as Error).message}`;
-      if ((e as Error).message.toLowerCase().includes('cors') || (e as Error).message.toLowerCase().includes('failed to fetch')) {
-        errorMessage = 'Lỗi kết nối (CORS/Fetch). Điều này có thể do API key Stability không hợp lệ, chính sách bảo mật trình duyệt hoặc vấn đề mạng.';
-      }
+      const errorMessage = `Đã xảy ra lỗi: ${(e as Error).message}`;
       updateState({ singleImageOverallError: errorMessage, singleImageProgressMessage: null });
     } finally {
       setIsProcessing(false);
-       setTimeout(() => {
+      setTimeout(() => {
         setModuleState(prev => 
-            (prev.singleImageProgressMessage?.includes("Hoàn thành tạo ảnh từ hook/truyện") )? 
-            {...prev, singleImageProgressMessage: null} : prev
+          (prev.singleImageProgressMessage?.includes("Hoàn thành tạo ảnh từ hook/truyện")) ? 
+          {...prev, singleImageProgressMessage: null} : prev
         );
       }, 3000);
     }
@@ -241,36 +222,42 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       updateState({ ctxPromptsError: 'Vui lòng nhập đoạn Hook hoặc Nội dung truyện của bạn.' });
       return;
     }
+
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ ctxPromptsError: 'Không đủ credit để tạo prompts!' });
+      return;
+    }
+
     updateState({ 
-        generatedCtxPrompts: [], 
-        ctxPromptsError: null, 
-        ctxPromptsLoadingMessage: 'Đang phân tích nội dung và tạo danh sách prompt (Ngữ cảnh Thông minh)...', 
+      generatedCtxPrompts: [], 
+      ctxPromptsError: null, 
+      ctxPromptsLoadingMessage: 'Đang phân tích nội dung và tạo danh sách prompt (Ngữ cảnh Thông minh)...', 
     });
     setIsProcessing(true);
 
     try {
-      const subPrompts = await generateSubPrompts(hookTextForCtxPrompts, true); // true for contextual
+      const subPrompts = await generateSubPrompts(hookTextForCtxPrompts, true);
       updateState({ 
-          generatedCtxPrompts: subPrompts, 
-          ctxPromptsLoadingMessage: `Hoàn thành! Đã tạo ${subPrompts.length} prompt.`,
-          ctxPromptsError: null
+        generatedCtxPrompts: subPrompts, 
+        ctxPromptsLoadingMessage: `Hoàn thành! Đã tạo ${subPrompts.length} prompt.`,
+        ctxPromptsError: null
       });
     } catch (e) {
       updateState({ 
-          ctxPromptsError: `Lỗi khi tạo prompts: ${(e as Error).message}`, 
-          ctxPromptsLoadingMessage: null 
+        ctxPromptsError: `Lỗi khi tạo prompts: ${(e as Error).message}`, 
+        ctxPromptsLoadingMessage: null 
       });
     } finally {
       setIsProcessing(false);
       setTimeout(() => {
         setModuleState(prev => 
-            (prev.ctxPromptsLoadingMessage?.includes("Hoàn thành!") || prev.ctxPromptsError )? 
-            {...prev, ctxPromptsLoadingMessage: null} : prev
+          (prev.ctxPromptsLoadingMessage?.includes("Hoàn thành!") || prev.ctxPromptsError) ? 
+          {...prev, ctxPromptsLoadingMessage: null} : prev
         );
       }, 3000);
     }
   };
-
 
   const handleGenerateBatchImages = async () => {
     const individualPrompts = promptsInput.split('\n').map(p => p.trim()).filter(p => p !== '');
@@ -278,66 +265,68 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
       updateState({ batchOverallError: 'Vui lòng nhập ít nhất một prompt (tiếng Anh).', settingsError: null });
       return;
     }
-    if (imageEngine === 'stability' && !stabilityApiKey.trim()) {
-      updateState({ settingsError: 'Vui lòng nhập API Key của Stability AI.', batchOverallError: null });
-      return;
-    }
-    if (imageEngine === 'chatgpt' && !chatGptApiKey.trim()) {
-      updateState({ settingsError: 'Vui lòng nhập API Key cho ChatGPT (DALL-E).', batchOverallError: null });
-      return;
-    }
-    if (imageEngine === 'deepseek' && !deepSeekImageApiKey.trim() && !deepseekGeneralApiKey) {
-      updateState({ settingsError: 'Vui lòng nhập API Key cho DeepSeek Image hoặc cấu hình trong Cài đặt AI chung nếu dùng chung key.', batchOverallError: null });
+
+    const estimatedCost = individualPrompts.length * 2; // 2 credits per image
+    const hasCredits = await consumeCredit(estimatedCost);
+    if (!hasCredits) {
+      updateState({ batchOverallError: `Không đủ credit để tạo ${individualPrompts.length} ảnh!` });
       return;
     }
 
-    updateState({ batchOverallError: null, generatedBatchImages: [], batchProgressMessage: null, settingsError: null });
+    updateState({ 
+      batchOverallError: null, 
+      generatedBatchImages: [], 
+      batchProgressMessage: null, 
+      settingsError: null 
+    });
     setIsProcessing(true);
 
     const initialGeneratedImages: GeneratedImageItem[] = individualPrompts.map(prompt => ({
-      promptUsed: prompt, imageUrl: null, error: null, engine: imageEngine
+      promptUsed: prompt, 
+      imageUrl: null, 
+      error: null, 
+      engine: 'gemini'
     }));
     updateState({ generatedBatchImages: initialGeneratedImages });
 
     const styleInfo = PREDEFINED_ART_STYLES.find(s => s.value === selectedArtStyle);
-    const styleKeywordForBatchEng = (styleInfo && styleInfo.value !== 'default') ? styleInfo.value.replace(/_/g, ' ') : null;
+    const styleKeywordForBatchEng = (styleInfo && styleInfo.value !== 'default') 
+      ? styleInfo.value.replace(/_/g, ' ') : null;
     const stylePrefix = styleKeywordForBatchEng ? styleKeywordForBatchEng + ", " : "";
 
     const newGeneratedImages: GeneratedImageItem[] = [...initialGeneratedImages];
 
     for (let i = 0; i < individualPrompts.length; i++) {
       const currentPromptText = individualPrompts[i];
-      updateState({ batchProgressMessage: `Đang tạo ảnh ${i + 1}/${individualPrompts.length}: "${currentPromptText.substring(0, 50)}..."` });
+      updateState({ 
+        batchProgressMessage: `Đang tạo ảnh ${i + 1}/${individualPrompts.length}: "${currentPromptText.substring(0, 50)}..."` 
+      });
       
-      if (i > 0) await delay(1500); 
+      if (i > 0) await delay(1500);
 
       const finalImagePrompt = `${stylePrefix}${currentPromptText}`.trim().replace(/,$/, '');
-      newGeneratedImages[i].promptUsed = finalImagePrompt; 
+      newGeneratedImages[i].promptUsed = finalImagePrompt;
 
       try {
-        let imageUrl: string | null = null;
-        let dalleRevisedPrompt: string | undefined = undefined;
-        if (imageEngine === 'google') {
-          const base64Image = await generateGeminiImage(finalImagePrompt, aspectRatio, geminiUserApiKey);
-          imageUrl = `data:image/png;base64,${base64Image}`;
-        } else if (imageEngine === 'stability') {
-          const imageBlob = await generateStabilityImage(
-            stabilityApiKey, finalImagePrompt, stabilityStyle, aspectRatio, stabilityNegativePrompt
-          );
-          imageUrl = URL.createObjectURL(imageBlob);
-        } else if (imageEngine === 'chatgpt') {
-           const resultDallE = await generateDallEImage(finalImagePrompt, aspectRatio, chatGptApiKey);
-           imageUrl = resultDallE;
-        } else if (imageEngine === 'deepseek') {
-          imageUrl = await generateDeepSeekImage(finalImagePrompt, aspectRatio, deepSeekImageApiKey, deepseekGeneralApiKey);
+        const imageResult = await generateImageViaBackend(finalImagePrompt, aspectRatio, 'gemini');
+        
+        if (imageResult.success && imageResult.imageData) {
+          const imageUrl = `data:image/png;base64,${imageResult.imageData}`;
+          newGeneratedImages[i] = { 
+            ...newGeneratedImages[i], 
+            imageUrl: imageUrl, 
+            error: null 
+          };
+        } else {
+          throw new Error(imageResult.error || 'Image generation failed');
         }
-        newGeneratedImages[i] = { ...newGeneratedImages[i], imageUrl: imageUrl, error: null, dalleRevisedPrompt: dalleRevisedPrompt };
       } catch (e) {
-        let errorMessage = `Lỗi tạo ảnh cho prompt "${currentPromptText.substring(0,30)}...": ${(e as Error).message}`;
-        if ((e as Error).message.toLowerCase().includes('cors') || (e as Error).message.toLowerCase().includes('failed to fetch')) {
-          errorMessage = `Lỗi kết nối khi tạo ảnh cho prompt "${currentPromptText.substring(0,30)}...". Kiểm tra API Key hoặc thử lại.`;
-        }
-        newGeneratedImages[i] = { ...newGeneratedImages[i], imageUrl: null, error: errorMessage };
+        const errorMessage = `Lỗi tạo ảnh cho prompt "${currentPromptText.substring(0,30)}...": ${(e as Error).message}`;
+        newGeneratedImages[i] = { 
+          ...newGeneratedImages[i], 
+          imageUrl: null, 
+          error: errorMessage 
+        };
       }
       updateState({ generatedBatchImages: [...newGeneratedImages] });
     }
@@ -347,572 +336,271 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     setIsProcessing(false);
   };
 
-  const openRefinementModal = (item: GeneratedImageItem, index: number, isBatch: boolean) => {
-    if (!item.imageUrl) return;
-    updateState({
-      showRefinementModal: true,
-      activeRefinementItem: {
-        originalItem: item,
-        itemIndex: index,
-        isBatchItem: isBatch,
-        originalImageDataUrl: item.imageUrl
-      },
-      refinementPrompt: '',
-      refinementError: null,
-    });
-  };
-
-  const handleRefineImage = async () => {
-    if (!activeRefinementItem || !activeRefinementItem.originalImageDataUrl || !refinementPrompt.trim()) {
-      updateState({ refinementError: "Dữ liệu không hợp lệ để tinh chỉnh." });
-      return;
-    }
-    updateState({ isRefining: true, refinementError: null });
-
-    const parsedData = parseDataUrl(activeRefinementItem.originalImageDataUrl);
-    if (!parsedData) {
-      updateState({ refinementError: "Không thể xử lý dữ liệu ảnh gốc.", isRefining: false });
-      return;
-    }
-    const { base64: originalImageBase64, mimeType: originalMimeType } = parsedData;
-
-    try {
-      let refinedImageUrl: string | null = null;
-      const currentEngine = activeRefinementItem.originalItem.engine;
-      let newPromptForRefinedItem = activeRefinementItem.originalItem.promptUsed; // Default to original
-
-
-      if (currentEngine === 'google') {
-        const refinedPromptGenSystemInstruction = `You are an expert image prompt engineer. Based on the provided original image and a user's refinement request, generate a new, highly detailed text prompt for the Imagen model. This new prompt should describe an image that incorporates the user's refinements while retaining the core essence of the original image. The new prompt MUST be in English.`;
-        const newTextPrompt = await generateTextFromImageAndText(
-          originalImageBase64,
-          originalMimeType,
-          `Original prompt may have been: "${activeRefinementItem.originalItem.promptUsed}". User refinement request: "${refinementPrompt}". Generate a new detailed prompt.`,
-          refinedPromptGenSystemInstruction,
-          geminiUserApiKey
-        );
-        const refinedImageB64 = await generateGeminiImage(newTextPrompt, aspectRatio, geminiUserApiKey);
-        refinedImageUrl = `data:image/png;base64,${refinedImageB64}`;
-        newPromptForRefinedItem = newTextPrompt;
-
-
-      } else if (currentEngine === 'stability') {
-        const refinedImageBlob = await refineStabilityImage(
-          stabilityApiKey,
-          await dataUrlToBlob(activeRefinementItem.originalImageDataUrl),
-          refinementPrompt, 
-          stabilityStyle, // Pass stability style for refinement too
-          // aspectRatio, // refineStabilityImage uses strength, aspect ratio is inherent in image
-          // stabilityNegativePrompt // Pass negative prompt
-        );
-        refinedImageUrl = URL.createObjectURL(refinedImageBlob);
-        newPromptForRefinedItem = refinementPrompt; 
-
-      } else if (currentEngine === 'chatgpt') {
-        refinedImageUrl = await editDallEImage(
-            originalImageBase64,
-            originalMimeType,
-            refinementPrompt, 
-            aspectRatio, 
-            chatGptApiKey
-        );
-        newPromptForRefinedItem = refinementPrompt; 
-
-      } else if (currentEngine === 'deepseek') {
-         refinedImageUrl = await refineDeepSeekImage(
-            originalImageBase64,
-            originalMimeType,
-            refinementPrompt,
-            aspectRatio,
-            deepSeekImageApiKey,
-            deepseekGeneralApiKey
-        );
-        newPromptForRefinedItem = refinementPrompt;
-      }
-
-      if (refinedImageUrl) {
-        const updatedItem: GeneratedImageItem = {
-          ...activeRefinementItem.originalItem,
-          imageUrl: refinedImageUrl,
-          promptUsed: newPromptForRefinedItem,
-          originalImageDataUrl: activeRefinementItem.originalImageDataUrl, 
-          originalPrompt: activeRefinementItem.originalItem.promptUsed,
-          error: null,
-        };
-
-        if (activeRefinementItem.isBatchItem) {
-          const updatedBatchImages = [...generatedBatchImages];
-          updatedBatchImages[activeRefinementItem.itemIndex] = updatedItem;
-          updateState({ generatedBatchImages: updatedBatchImages });
-        } else {
-          const updatedSingleImages = [...generatedSingleImages];
-          updatedSingleImages[activeRefinementItem.itemIndex] = updatedItem;
-          updateState({ generatedSingleImages: updatedSingleImages });
-        }
-      }
-      updateState({ showRefinementModal: false, isRefining: false, activeRefinementItem: null, refinementPrompt: '' });
-
-    } catch (e) {
-      updateState({ refinementError: `Lỗi tinh chỉnh ảnh: ${(e as Error).message}`, isRefining: false });
-    }
-  };
-  
   const TabButton: React.FC<{ tabId: ImageGenerationSuiteActiveTab; label: string, icon?: string }> = ({ tabId, label, icon }) => (
     <button
-      onClick={() => { updateState({ 
+      onClick={() => { 
+        updateState({ 
           activeTab: tabId, 
-          singleImageOverallError: null, batchOverallError: null, settingsError: null, ctxPromptsError: null,
-          singleImageProgressMessage: null, batchProgressMessage: null, ctxPromptsLoadingMessage: null
-      });}}
+          singleImageOverallError: null, 
+          batchOverallError: null, 
+          settingsError: null, 
+          ctxPromptsError: null,
+          singleImageProgressMessage: null, 
+          batchProgressMessage: null, 
+          ctxPromptsLoadingMessage: null
+        });
+      }}
       className={`flex items-center space-x-2 px-4 py-3 font-medium rounded-t-lg text-base transition-colors
                   ${activeTab === tabId 
                       ? 'bg-indigo-600 text-white shadow-md' 
                       : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                   }`}
-        aria-selected={activeTab === tabId}
-        role="tab"
-        disabled={isProcessing || isRefining}
+      aria-selected={activeTab === tabId}
+      role="tab"
+      disabled={isProcessing}
     >
       {icon && <span className="text-lg">{icon}</span>}
       <span>{label}</span>
     </button>
   );
 
-  const copyToClipboard = (textToCopy: string, buttonId?: string) => {
+  const copyToClipboard = (textToCopy: string) => {
     if (!textToCopy) return;
     navigator.clipboard.writeText(textToCopy);
-    if (buttonId) {
-        const btn = document.getElementById(buttonId);
-        if (btn) {
-            const originalText = btn.textContent;
-            btn.textContent = 'Đã sao chép!';
-            setTimeout(() => { btn.textContent = originalText; }, 2000);
-        }
-    } else {
-        alert("Đã sao chép!"); // Fallback if no button ID
-    }
+    alert("Đã sao chép!");
   };
 
-  const copyItemPromptToClipboard = (item: GeneratedImageItem) => {
-    const textToCopy = item.dalleRevisedPrompt || item.promptUsed;
-    // You might want a unique button ID strategy if this is called for many items,
-    // or simplify to just an alert without changing button text.
-    copyToClipboard(textToCopy); 
+  const downloadImage = (imageUrl: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
-
 
   return (
-    <ModuleContainer title="🎨 Xưởng Tạo Ảnh AI">
+    <ModuleContainer title="🎨 Bộ Công Cụ Tạo Ảnh AI">
       <InfoBox>
-        <p><strong>💡 Hướng dẫn:</strong> Chọn chế độ tạo ảnh mong muốn từ các tab bên dưới.</p>
-        <p className="mt-1"><strong>"📸 Ảnh AI từ Hook/Truyện":</strong> Nhập hook hoặc nội dung truyện. AI sẽ tự phân tích và tạo nhiều prompt ảnh tiếng Anh, sau đó tạo ảnh.</p>
-        <p className="mt-1"><strong>"📸 Ảnh AI (Ngữ Cảnh Thông minh)":</strong> Tương tự như trên, nhưng AI sẽ cố gắng tạo prompt ảnh (vẫn bằng Tiếng Anh) phản ánh bối cảnh văn hóa phù hợp với ngôn ngữ của truyện (ví dụ: Tiếng Việt -&gt; bối cảnh Việt, Tiếng Hàn -&gt; bối cảnh Hàn), rồi tạo ảnh.</p>
-        <p className="mt-1"><strong>"📝 Tạo Prompt (Ngữ Cảnh Thông minh)":</strong> Nhập hook/truyện. AI sẽ phân tích và tạo danh sách prompt tiếng Anh (đã bao gồm phong cách nghệ thuật và ngữ cảnh văn hóa) để bạn sao chép và sử dụng ở nơi khác. Tab này không tự tạo ảnh.</p>
-        <p className="mt-1"><strong>"🖼️ Ảnh Hàng Loạt (Prompts)":</strong> Nhập danh sách prompt tiếng Anh (mỗi prompt một dòng), AI sẽ tạo ảnh.</p>
-        <p className="mt-1"><strong>Mới:</strong> Sau khi ảnh được tạo, bạn có thể nhấp vào nút "🎨 Tinh Chỉnh (i2i)" để yêu cầu AI sửa đổi hoặc thay đổi phong cách ảnh đó.</p>
-        <p className="mt-1"><strong>Lưu ý về API:</strong> Chức năng này có thể sử dụng API của Google Imagen, Stability AI, ChatGPT (DALL-E), hoặc DeepSeek. Hãy đảm bảo bạn có API Key hợp lệ và đủ credit cho dịch vụ bạn chọn.</p>
+        <strong>💡 Lưu ý:</strong> Module này hiện sử dụng Gemini AI thông qua backend proxy. 
+        Tất cả API keys được quản lý qua webadmin. Chi phí: ~1-2 credit/ảnh.
       </InfoBox>
-      
-      {/* Common Settings */}
-      <div className="p-6 mb-8 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">Cài đặt Chung cho Xưởng Ảnh</h3>
+
+      <div className="space-y-6">
+        {/* Tab Navigation */}
+        <div className="flex flex-wrap gap-2" role="tablist">
+          <TabButton tabId="singleImageGenerator" label="Tạo Ảnh Từ Hook" icon="🖼️" />
+          <TabButton tabId="contextualImageGenerator" label="Ngữ Cảnh Thông Minh" icon="🧠" />
+          <TabButton tabId="batchImageGenerator" label="Tạo Ảnh Hàng Loạt" icon="📚" />
+          <TabButton tabId="contextualPromptGenerator" label="Tạo Prompt Thông Minh" icon="✨" />
+        </div>
+
+        {/* Common Settings */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <label htmlFor="aspectRatio" className="block text-sm font-medium text-gray-700 mb-1">
+              Tỷ lệ ảnh:
+            </label>
+            <select
+              id="aspectRatio"
+              value={aspectRatio}
+              onChange={(e) => updateState({ aspectRatio: e.target.value })}
+              className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
+              disabled={isProcessing}
+            >
+              {ASPECT_RATIO_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="selectedArtStyle" className="block text-sm font-medium text-gray-700 mb-1">
+              Phong cách nghệ thuật:
+            </label>
+            <select
+              id="selectedArtStyle"
+              value={selectedArtStyle}
+              onChange={(e) => updateState({ selectedArtStyle: e.target.value })}
+              className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
+              disabled={isProcessing}
+            >
+              {PREDEFINED_ART_STYLES.map(style => (
+                <option key={style.value} value={style.value}>{style.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {(activeTab === 'singleImageGenerator' || activeTab === 'contextualImageGenerator') && (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="hookText" className="block text-sm font-medium text-gray-700 mb-1">
+                Hook hoặc Nội dung truyện:
+              </label>
+              <textarea
+                id="hookText"
+                value={hookText}
+                onChange={(e) => updateState({ hookText: e.target.value })}
+                rows={4}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
+                placeholder="Nhập hook hoặc nội dung truyện để tạo ảnh minh họa..."
+                disabled={isProcessing}
+              />
+            </div>
+            <button
+              onClick={() => executeImageGenerationFromHook(activeTab === 'contextualImageGenerator')}
+              disabled={isProcessing}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {isProcessing ? 'Đang xử lý...' : `🎨 Tạo Ảnh ${activeTab === 'contextualImageGenerator' ? '(Ngữ Cảnh Thông Minh)' : ''}`}
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'batchImageGenerator' && (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="promptsInput" className="block text-sm font-medium text-gray-700 mb-1">
+                Danh sách prompts (mỗi dòng một prompt):
+              </label>
+              <textarea
+                id="promptsInput"
+                value={promptsInput}
+                onChange={(e) => updateState({ promptsInput: e.target.value })}
+                rows={6}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
+                placeholder="Nhập các prompt ảnh bằng tiếng Anh, mỗi dòng một prompt..."
+                disabled={isProcessing}
+              />
+            </div>
+            <button
+              onClick={handleGenerateBatchImages}
+              disabled={isProcessing}
+              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {isProcessing ? 'Đang tạo ảnh...' : '📚 Tạo Ảnh Hàng Loạt'}
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'contextualPromptGenerator' && (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="hookTextForCtxPrompts" className="block text-sm font-medium text-gray-700 mb-1">
+                Hook hoặc Nội dung truyện:
+              </label>
+              <textarea
+                id="hookTextForCtxPrompts"
+                value={hookTextForCtxPrompts}
+                onChange={(e) => updateState({ hookTextForCtxPrompts: e.target.value })}
+                rows={4}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
+                placeholder="Nhập hook hoặc nội dung truyện để tạo prompt thông minh..."
+                disabled={isProcessing}
+              />
+            </div>
+            <button
+              onClick={handleGenerateIntelligentContextPromptsOnly}
+              disabled={isProcessing}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {isProcessing ? 'Đang tạo prompts...' : '✨ Tạo Prompt Thông Minh'}
+            </button>
+          </div>
+        )}
+
+        {/* Progress Messages */}
+        {isProcessing && (
+          <LoadingSpinner message={
+            singleImageProgressMessage || 
+            batchProgressMessage || 
+            ctxPromptsLoadingMessage || 
+            'Đang xử lý...'
+          } />
+        )}
+
+        {/* Errors */}
         {settingsError && <ErrorAlert message={settingsError} />}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div>
-                <label htmlFor="igsImageEngine" className="block text-sm font-medium text-gray-700 mb-1">Chọn Engine Tạo Ảnh:</label>
-                <select 
-                    id="igsImageEngine" 
-                    value={imageEngine} 
-                    onChange={(e) => updateState({ imageEngine: e.target.value as ImageGenerationEngine, settingsError: null })} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
-                    disabled={isProcessing || isRefining}
-                >
-                    {IMAGE_GENERATION_ENGINE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-            </div>
-            <div>
-                <label htmlFor="igsArtStyle" className="block text-sm font-medium text-gray-700 mb-1">Chọn Phong cách Nghệ thuật:</label>
-                <select 
-                    id="igsArtStyle" 
-                    value={selectedArtStyle} 
-                    onChange={(e) => updateState({ selectedArtStyle: e.target.value })} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
-                    disabled={isProcessing || isRefining}
-                >
-                    {PREDEFINED_ART_STYLES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-            </div>
-            <div>
-                <label htmlFor="igsAspectRatio" className="block text-sm font-medium text-gray-700 mb-1">Tỷ lệ Khung hình Ảnh:</label>
-                <select 
-                    id="igsAspectRatio" 
-                    value={aspectRatio} 
-                    onChange={(e) => updateState({ aspectRatio: e.target.value })} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
-                    disabled={isProcessing || isRefining}
-                >
-                    {ASPECT_RATIO_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-            </div>
-        </div>
-        {/* Engine Specific API Keys */}
-        {imageEngine === 'stability' && (
-            <div className="mt-4">
-                <label htmlFor="igsStabilityKey" className="block text-sm font-medium text-gray-700 mb-1">API Key Stability AI (SD3):</label>
-                <input type="password" id="igsStabilityKey" value={stabilityApiKey} onChange={(e) => updateState({ stabilityApiKey: e.target.value, settingsError: null })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" placeholder="Nhập API Key Stability AI của bạn" disabled={isProcessing || isRefining}/>
-            </div>
-        )}
-        {imageEngine === 'chatgpt' && (
-            <div className="mt-4">
-                <label htmlFor="igsChatGptKey" className="block text-sm font-medium text-gray-700 mb-1">API Key ChatGPT (DALL-E):</label>
-                <input type="password" id="igsChatGptKey" value={chatGptApiKey} onChange={(e) => updateState({ chatGptApiKey: e.target.value, settingsError: null })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" placeholder="Nhập API Key OpenAI của bạn (dùng cho DALL-E)" disabled={isProcessing || isRefining}/>
-            </div>
-        )}
-         {imageEngine === 'deepseek' && (
-            <div className="mt-4">
-                <label htmlFor="igsDeepSeekImageKey" className="block text-sm font-medium text-gray-700 mb-1">API Key DeepSeek Image:</label>
-                <input type="password" id="igsDeepSeekImageKey" value={deepSeekImageApiKey} onChange={(e) => updateState({ deepSeekImageApiKey: e.target.value, settingsError: null })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" placeholder="Nhập API Key DeepSeek Image (nếu riêng)" disabled={isProcessing || isRefining}/>
-                <p className="text-xs text-gray-500 mt-1">Nếu DeepSeek là nhà cung cấp AI văn bản chung và dùng chung key, bạn có thể để trống ô này nếu key đã được cấu hình ở Cài Đặt AI chung.</p>
-            </div>
-        )}
-        {/* Stability AI Specific Settings */}
-        {imageEngine === 'stability' && (
-            <div className="mt-6 p-4 border-t-2 border-dashed border-gray-300">
-                <h4 className="text-md font-semibold text-gray-700 mb-3">Cài đặt Riêng cho Stability AI (SD3)</h4>
-                <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                        <label htmlFor="igsStabilityStyle" className="block text-sm font-medium text-gray-700 mb-1">Style Preset (SD3):</label>
-                        <select id="igsStabilityStyle" value={stabilityStyle} onChange={(e) => updateState({ stabilityStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" disabled={isProcessing || isRefining}>
-                            {STABILITY_STYLE_PRESETS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="igsStabilityNegativePrompt" className="block text-sm font-medium text-gray-700 mb-1">Negative Prompt (SD3):</label>
-                        <input type="text" id="igsStabilityNegativePrompt" value={stabilityNegativePrompt} onChange={(e) => updateState({ stabilityNegativePrompt: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" placeholder="Ví dụ: blurry, ugly, watermark" disabled={isProcessing || isRefining}/>
-                    </div>
-                </div>
-            </div>
-        )}
-      </div>
+        {singleImageOverallError && <ErrorAlert message={singleImageOverallError} />}
+        {batchOverallError && <ErrorAlert message={batchOverallError} />}
+        {ctxPromptsError && <ErrorAlert message={ctxPromptsError} />}
 
-      {/* Tabs */}
-      <div className="mb-6 flex flex-wrap gap-1 border-b-2 border-gray-300" role="tablist" aria-label="Chế độ tạo ảnh">
-        <TabButton tabId="hookStory" label="Ảnh AI từ Hook/Truyện" icon="📸"/>
-        <TabButton tabId="intelligentContextImageGenerator" label="Ảnh AI (Ngữ Cảnh Thông minh)" icon="🧠"/>
-        <TabButton tabId="intelligentContextPromptGenerator" label="Tạo Prompt (Ngữ Cảnh Thông minh)" icon="📝"/>
-        <TabButton tabId="batch" label="Ảnh Hàng Loạt (Prompts)" icon="🖼️"/>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'hookStory' && (
-        <div role="tabpanel" id="hook-story-panel" className="animate-fadeIn space-y-6">
-            <h3 className="text-xl font-semibold text-gray-800">📸 Ảnh AI từ Hook/Truyện</h3>
-             <InfoBox variant="info">
-                <p>AI sẽ phân tích nội dung bạn nhập, tự động tạo ra các prompt ảnh chi tiết (bằng Tiếng Anh) cho từng cảnh/ý tưởng quan trọng, sau đó tạo ảnh theo các prompt đó. Phong cách nghệ thuật và tỷ lệ khung hình sẽ được lấy từ "Cài đặt chung".</p>
-            </InfoBox>
-            <div>
-                <label htmlFor="igsHookText" className="block text-sm font-medium text-gray-700 mb-1">Nhập Hook hoặc Nội dung truyện (để AI phân tích tạo ảnh):</label>
-                <textarea 
-                    id="igsHookText" 
-                    value={hookText} 
-                    onChange={(e) => updateState({ hookText: e.target.value, singleImageOverallError: null })} 
-                    rows={5} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                    placeholder="Dán hook, tóm tắt hoặc toàn bộ truyện của bạn vào đây..."
-                    disabled={isProcessing || isRefining}
-                />
-            </div>
-            <button 
-                onClick={() => executeImageGenerationFromHook(false)} 
-                disabled={isProcessing || isRefining || !hookText.trim()} 
-                className="w-full bg-gradient-to-r from-blue-600 to-sky-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-                🚀 Bắt đầu Tạo Ảnh Từ Hook/Truyện
-            </button>
-            {isProcessing && singleImageProgressMessage && <LoadingSpinner message={singleImageProgressMessage} />}
-            {!isProcessing && singleImageProgressMessage && <p className="text-center text-blue-600 font-medium my-2">{singleImageProgressMessage}</p>}
-            {singleImageOverallError && <ErrorAlert message={singleImageOverallError} />}
-            {generatedSingleImages.length > 0 && (
-                <div className="mt-8">
-                    <h4 className="text-lg font-semibold text-gray-700 mb-3">Ảnh Đã Tạo Từ Hook/Truyện:</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {generatedSingleImages.map((item, index) => (
-                            <div key={index} className="border rounded-lg p-3 shadow-sm bg-white flex flex-col">
-                                {item.imageUrl ? (
-                                    <img src={item.imageUrl} alt={`Generated ${index + 1}`} className="w-full h-auto rounded-md object-contain mb-2"/>
-                                ) : item.error ? (
-                                    <div className="w-full h-48 flex items-center justify-center bg-gray-100 rounded-md mb-2">
-                                        <p className="text-red-500 text-xs text-center p-2">{item.error}</p>
-                                    </div>
-                                ) : (
-                                    <div className="w-full h-48 flex items-center justify-center bg-gray-100 rounded-md mb-2">
-                                        <LoadingSpinner message="Đang chờ..." noMargins={true}/>
-                                    </div>
-                                )}
-                                <details className="text-xs text-gray-600 mt-auto">
-                                    <summary className="cursor-pointer hover:text-indigo-600">Prompt đã sử dụng (Engine: {item.engine})</summary>
-                                    <p className="mt-1 p-1 bg-gray-50 border rounded whitespace-pre-wrap">{item.dalleRevisedPrompt || item.promptUsed}</p>
-                                     <button id={`copySinglePromptBtn-${index}`} onClick={() => copyToClipboard(item.dalleRevisedPrompt || item.promptUsed, `copySinglePromptBtn-${index}`)} className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">Sao chép Prompt</button>
-                                </details>
-                                {item.imageUrl && (
-                                    <button
-                                        onClick={() => openRefinementModal(item, index, false)}
-                                        className="mt-2 w-full text-xs bg-purple-500 hover:bg-purple-600 text-white font-medium py-1.5 px-2 rounded-md transition-colors"
-                                    >
-                                       🎨 Tinh Chỉnh (i2i)
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-      )}
-      
-      {activeTab === 'intelligentContextImageGenerator' && (
-         <div role="tabpanel" id="ctx-image-gen-panel" className="animate-fadeIn space-y-6">
-            <h3 className="text-xl font-semibold text-gray-800">🧠 Ảnh AI (Ngữ Cảnh Thông minh)</h3>
-             <InfoBox variant="info">
-                <p>Tương tự tab "Ảnh AI từ Hook/Truyện", nhưng AI sẽ cố gắng tạo prompt ảnh (bằng Tiếng Anh) phản ánh bối cảnh văn hóa phù hợp với ngôn ngữ của truyện (ví dụ: Tiếng Việt -&gt; bối cảnh Việt, Tiếng Hàn -&gt; bối cảnh Hàn), sau đó tạo ảnh.</p>
-            </InfoBox>
-            <div>
-                <label htmlFor="igsCtxHookText" className="block text-sm font-medium text-gray-700 mb-1">Nhập Hook hoặc Nội dung truyện (AI sẽ phân tích ngôn ngữ để tạo ảnh theo ngữ cảnh):</label>
-                <textarea 
-                    id="igsCtxHookText" 
-                    value={hookText} // Reuses hookText from state for input
-                    onChange={(e) => updateState({ hookText: e.target.value, singleImageOverallError: null })} 
-                    rows={5} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                    placeholder="Dán hook, tóm tắt hoặc toàn bộ truyện của bạn vào đây..."
-                    disabled={isProcessing || isRefining}
-                />
-            </div>
-            <button 
-                onClick={() => executeImageGenerationFromHook(true)} 
-                disabled={isProcessing || isRefining || !hookText.trim()} 
-                className="w-full bg-gradient-to-r from-teal-600 to-emerald-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-                🚀 Bắt đầu Tạo Ảnh (Ngữ Cảnh Thông minh)
-            </button>
-            {isProcessing && singleImageProgressMessage && <LoadingSpinner message={singleImageProgressMessage} />}
-            {!isProcessing && singleImageProgressMessage && <p className="text-center text-teal-600 font-medium my-2">{singleImageProgressMessage}</p>}
-            {singleImageOverallError && <ErrorAlert message={singleImageOverallError} />}
-            {/* Display logic for generatedSingleImages is the same as 'hookStory' tab */}
-             {generatedSingleImages.length > 0 && (
-                <div className="mt-8">
-                    <h4 className="text-lg font-semibold text-gray-700 mb-3">Ảnh Đã Tạo (Ngữ Cảnh Thông minh):</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {generatedSingleImages.map((item, index) => (
-                            <div key={index} className="border rounded-lg p-3 shadow-sm bg-white flex flex-col">
-                                {item.imageUrl ? (
-                                    <img src={item.imageUrl} alt={`Generated Ctx ${index + 1}`} className="w-full h-auto rounded-md object-contain mb-2"/>
-                                ) : item.error ? (
-                                    <div className="w-full h-48 flex items-center justify-center bg-gray-100 rounded-md mb-2">
-                                        <p className="text-red-500 text-xs text-center p-2">{item.error}</p>
-                                    </div>
-                                ) : (
-                                     <div className="w-full h-48 flex items-center justify-center bg-gray-100 rounded-md mb-2">
-                                        <LoadingSpinner message="Đang chờ..." noMargins={true}/>
-                                    </div>
-                                )}
-                               <details className="text-xs text-gray-600 mt-auto">
-                                    <summary className="cursor-pointer hover:text-indigo-600">Prompt đã sử dụng (Engine: {item.engine})</summary>
-                                    <p className="mt-1 p-1 bg-gray-50 border rounded whitespace-pre-wrap">{item.dalleRevisedPrompt || item.promptUsed}</p>
-                                     <button id={`copyCtxPromptBtn-${index}`} onClick={() => copyToClipboard(item.dalleRevisedPrompt || item.promptUsed, `copyCtxPromptBtn-${index}`)} className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">Sao chép Prompt</button>
-                                </details>
-                                {item.imageUrl && (
-                                    <button
-                                        onClick={() => openRefinementModal(item, index, false)}
-                                        className="mt-2 w-full text-xs bg-purple-500 hover:bg-purple-600 text-white font-medium py-1.5 px-2 rounded-md transition-colors"
-                                    >
-                                       🎨 Tinh Chỉnh (i2i)
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-      )}
-      
-      {activeTab === 'intelligentContextPromptGenerator' && (
-        <div role="tabpanel" id="ctx-prompt-gen-panel" className="animate-fadeIn space-y-6">
-            <h3 className="text-xl font-semibold text-gray-800">📝 Tạo Prompt (Ngữ Cảnh Thông minh)</h3>
-            <InfoBox variant="info">
-                <p>Nhập hook hoặc nội dung truyện. AI sẽ phân tích và tạo một danh sách các prompt ảnh (bằng Tiếng Anh) đã bao gồm phong cách nghệ thuật (từ Cài đặt chung) và ngữ cảnh văn hóa (nếu ngôn ngữ đầu vào là Tiếng Việt hoặc Tiếng Hàn). Bạn có thể sao chép các prompt này để sử dụng ở nơi khác.</p>
-                <p className="font-semibold mt-1">Tab này KHÔNG tự động tạo ảnh.</p>
-            </InfoBox>
-            <div>
-                <label htmlFor="igsHookTextForCtxPrompts" className="block text-sm font-medium text-gray-700 mb-1">Nhập Hook hoặc Nội dung truyện (AI sẽ phân tích ngôn ngữ để tạo prompt theo ngữ cảnh):</label>
-                <textarea 
-                    id="igsHookTextForCtxPrompts" 
-                    value={hookTextForCtxPrompts} 
-                    onChange={(e) => updateState({ hookTextForCtxPrompts: e.target.value, ctxPromptsError: null })} 
-                    rows={5} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                    placeholder="Dán hook, tóm tắt hoặc toàn bộ truyện của bạn vào đây..."
-                    disabled={isProcessing || isRefining}
-                />
-            </div>
-             <button 
-                onClick={handleGenerateIntelligentContextPromptsOnly} 
-                disabled={isProcessing || isRefining || !hookTextForCtxPrompts.trim()} 
-                className="w-full bg-gradient-to-r from-green-600 to-lime-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-                🚀 Tạo Danh Sách Prompt (Ngữ Cảnh Thông minh)
-            </button>
-            {isProcessing && ctxPromptsLoadingMessage && <LoadingSpinner message={ctxPromptsLoadingMessage} />}
-            {!isProcessing && ctxPromptsLoadingMessage && <p className="text-center text-green-600 font-medium my-2">{ctxPromptsLoadingMessage}</p>}
-            {ctxPromptsError && <ErrorAlert message={ctxPromptsError} />}
-            {generatedCtxPrompts.length > 0 && (
-                <div className="mt-6 p-4 border rounded-lg bg-gray-50">
-                    <h4 className="text-lg font-semibold text-gray-700 mb-2">Danh Sách Prompt Đã Tạo (Tiếng Anh):</h4>
-                    <textarea 
-                        value={generatedCtxPrompts.join('\n\n')} 
-                        readOnly 
-                        rows={Math.min(15, generatedCtxPrompts.length * 2 + 2)} 
-                        className="w-full p-3 border-2 border-gray-200 rounded-md bg-white whitespace-pre-wrap leading-relaxed"
-                        aria-label="Generated contextual prompts"
-                    />
-                    <button 
-                        id="copyCtxPromptsBtn" 
-                        onClick={() => copyToClipboard(generatedCtxPrompts.join('\n\n'), "copyCtxPromptsBtn")} 
-                        className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                        disabled={isProcessing || isRefining}
+        {/* Generated Context Prompts */}
+        {generatedCtxPrompts.length > 0 && (
+          <div className="mt-6 p-4 border rounded-lg bg-purple-50">
+            <h3 className="text-lg font-semibold mb-4 text-purple-700">✨ Prompt Thông Minh Đã Tạo:</h3>
+            <div className="space-y-2">
+              {generatedCtxPrompts.map((prompt, index) => (
+                <div key={index} className="p-3 bg-white border border-purple-200 rounded-md">
+                  <div className="flex justify-between items-start">
+                    <span className="text-sm text-purple-800 flex-1">{index + 1}. {prompt}</span>
+                    <button
+                      onClick={() => copyToClipboard(prompt)}
+                      className="ml-2 px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
                     >
-                        📋 Sao chép Tất cả Prompts
+                      Sao chép
                     </button>
+                  </div>
                 </div>
-            )}
-        </div>
-      )}
-
-      {activeTab === 'batch' && (
-         <div role="tabpanel" id="batch-panel" className="animate-fadeIn space-y-6">
-            <h3 className="text-xl font-semibold text-gray-800">🖼️ Ảnh Hàng Loạt (Từ Prompts Tiếng Anh)</h3>
-             <InfoBox variant="info">
-                <p>Nhập danh sách các prompt tạo ảnh (bằng Tiếng Anh), mỗi prompt một dòng. AI sẽ tạo ảnh cho từng prompt. Phong cách nghệ thuật và tỷ lệ khung hình sẽ được lấy từ "Cài đặt chung" và tự động thêm vào mỗi prompt.</p>
-            </InfoBox>
-            <div>
-                <label htmlFor="igsPromptsInput" className="block text-sm font-medium text-gray-700 mb-1">Nhập danh sách Prompts (Tiếng Anh, mỗi prompt một dòng):</label>
-                <textarea 
-                    id="igsPromptsInput" 
-                    value={promptsInput} 
-                    onChange={(e) => updateState({ promptsInput: e.target.value, batchOverallError: null })} 
-                    rows={8} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-                    placeholder="Ví dụ:\nA majestic dragon flying over a medieval castle, cinematic lighting\nA futuristic cityscape at night with flying vehicles, neon lights"
-                    disabled={isProcessing || isRefining}
-                />
+              ))}
             </div>
-            <button 
-                onClick={handleGenerateBatchImages} 
-                disabled={isProcessing || isRefining || !promptsInput.trim()} 
-                className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-                🚀 Bắt đầu Tạo Ảnh Hàng Loạt
-            </button>
-            {isProcessing && batchProgressMessage && <LoadingSpinner message={batchProgressMessage} />}
-            {!isProcessing && batchProgressMessage && <p className="text-center text-orange-600 font-medium my-2">{batchProgressMessage}</p>}
-            {batchOverallError && <ErrorAlert message={batchOverallError} />}
-            {generatedBatchImages.length > 0 && (
-                 <div className="mt-8">
-                    <h4 className="text-lg font-semibold text-gray-700 mb-3">Ảnh Hàng Loạt Đã Tạo:</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {generatedBatchImages.map((item, index) => (
-                             <div key={index} className="border rounded-lg p-3 shadow-sm bg-white flex flex-col">
-                                {item.imageUrl ? (
-                                    <img src={item.imageUrl} alt={`Batch ${index + 1}`} className="w-full h-auto rounded-md object-contain mb-2"/>
-                                ) : item.error ? (
-                                     <div className="w-full h-48 flex items-center justify-center bg-gray-100 rounded-md mb-2">
-                                        <p className="text-red-500 text-xs text-center p-2">{item.error}</p>
-                                    </div>
-                                ) : (
-                                    <div className="w-full h-48 flex items-center justify-center bg-gray-100 rounded-md mb-2">
-                                        <LoadingSpinner message="Đang chờ..." noMargins={true}/>
-                                    </div>
-                                )}
-                                <details className="text-xs text-gray-600 mt-auto">
-                                    <summary className="cursor-pointer hover:text-indigo-600">Prompt đã sử dụng (Engine: {item.engine})</summary>
-                                    <p className="mt-1 p-1 bg-gray-50 border rounded whitespace-pre-wrap">{item.dalleRevisedPrompt || item.promptUsed}</p>
-                                     <button id={`copyBatchPromptBtn-${index}`} onClick={() => copyToClipboard(item.dalleRevisedPrompt || item.promptUsed, `copyBatchPromptBtn-${index}`)} className="mt-1 px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">Sao chép Prompt</button>
-                                </details>
-                                {item.imageUrl && (
-                                    <button
-                                        onClick={() => openRefinementModal(item, index, true)}
-                                        className="mt-2 w-full text-xs bg-purple-500 hover:bg-purple-600 text-white font-medium py-1.5 px-2 rounded-md transition-colors"
-                                    >
-                                       🎨 Tinh Chỉnh (i2i)
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-      )}
-
-        {/* Refinement Modal */}
-        {showRefinementModal && activeRefinementItem && (
-            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-fadeIn" onClick={() => updateState({ showRefinementModal: false, activeRefinementItem: null})}>
-                <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">🎨 Tinh Chỉnh Ảnh (Image-to-Image)</h3>
-                    <div className="mb-4 max-h-60 overflow-hidden rounded-md">
-                        <img src={activeRefinementItem.originalImageDataUrl} alt="Ảnh gốc để tinh chỉnh" className="w-full h-full object-contain"/>
-                    </div>
-                     <p className="text-xs text-gray-500 mb-1 italic">Prompt gốc: {activeRefinementItem.originalItem.promptUsed}</p>
-                     <p className="text-xs text-gray-500 mb-3 italic">Engine: {activeRefinementItem.originalItem.engine}</p>
-                    <div>
-                        <label htmlFor="refinementPrompt" className="block text-sm font-medium text-gray-700 mb-1">
-                            Yêu cầu Tinh chỉnh (Mô tả ảnh mới mong muốn, bằng Tiếng Anh):
-                        </label>
-                        <textarea
-                            id="refinementPrompt"
-                            value={refinementPrompt}
-                            onChange={(e) => updateState({ refinementPrompt: e.target.value })}
-                            rows={4}
-                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm"
-                            placeholder="Ví dụ: Make the character smile, change background to a beach. Hoặc: Turn this into a Picasso style painting."
-                            disabled={isRefining}
-                        />
-                        {activeRefinementItem.originalItem.engine === 'stability' && (
-                            <p className="text-xs text-gray-500 mt-1">Lưu ý: Với Stability, prompt này sẽ được sử dụng cho image-to-image. Phong cách và negative prompt từ cài đặt chung cũng sẽ được áp dụng.</p>
-                        )}
-                        {activeRefinementItem.originalItem.engine === 'chatgpt' && (
-                             <p className="text-xs text-gray-500 mt-1">Lưu ý: Với DALL-E, prompt này mô tả toàn bộ ảnh mới bạn muốn, dựa trên ảnh gốc. Ảnh gốc có thể được sử dụng như một phần của mask (ẩn) hoặc không, tùy thuộc vào prompt.</p>
-                        )}
-                         {activeRefinementItem.originalItem.engine === 'deepseek' && (
-                             <p className="text-xs text-orange-600 mt-1">Lưu ý: Chức năng Image-to-Image của DeepSeek đang trong giai đoạn thử nghiệm và có thể chưa hoạt động như mong đợi. Vui lòng kiểm tra tài liệu chính thức của DeepSeek.</p>
-                        )}
-                         {activeRefinementItem.originalItem.engine === 'google' && (
-                             <p className="text-xs text-gray-500 mt-1">Lưu ý: AI sẽ tạo một prompt mới dựa trên yêu cầu của bạn và ảnh gốc, sau đó tạo ảnh từ prompt mới đó.</p>
-                        )}
-                    </div>
-                    {isRefining && <LoadingSpinner message="Đang tinh chỉnh ảnh..." />}
-                    {refinementError && <ErrorAlert message={refinementError} />}
-                    <div className="mt-6 flex justify-end space-x-3">
-                        <button
-                            onClick={() => updateState({ showRefinementModal: false, activeRefinementItem: null })}
-                            disabled={isRefining}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50"
-                        >
-                            Hủy
-                        </button>
-                        <button
-                            onClick={handleRefineImage}
-                            disabled={isRefining || !refinementPrompt.trim()}
-                            className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50"
-                        >
-                            Bắt đầu Tinh Chỉnh
-                        </button>
-                    </div>
-                </div>
-            </div>
+          </div>
         )}
 
+        {/* Generated Images */}
+        {(generatedSingleImages.length > 0 || generatedBatchImages.length > 0) && (
+          <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+            <h3 className="text-lg font-semibold mb-4 text-gray-700">🖼️ Ảnh Đã Tạo:</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...generatedSingleImages, ...generatedBatchImages].map((item, index) => (
+                <div key={index} className="bg-white p-4 rounded-lg shadow-sm border">
+                  {item.imageUrl ? (
+                    <div className="space-y-2">
+                      <img 
+                        src={item.imageUrl} 
+                        alt={`Generated ${index + 1}`}
+                        className="w-full h-48 object-cover rounded-md"
+                      />
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-600 break-words">{item.promptUsed}</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => copyToClipboard(item.promptUsed)}
+                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            Copy Prompt
+                          </button>
+                          <button
+                            onClick={() => downloadImage(item.imageUrl!, `generated-image-${index + 1}.png`)}
+                            className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-48 flex items-center justify-center bg-gray-100 rounded-md">
+                      {item.error ? (
+                        <div className="text-center p-2">
+                          <p className="text-red-600 text-xs">{item.error}</p>
+                          <p className="text-gray-500 text-xs mt-1">{item.promptUsed}</p>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
+                          <p className="text-gray-500 text-xs mt-1">Đang tạo...</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </ModuleContainer>
   );
 };
