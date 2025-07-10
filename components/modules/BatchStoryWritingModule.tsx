@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-    ApiSettings, 
     BatchStoryWritingModuleState, 
     BatchStoryInputItem, 
     GeneratedBatchStoryOutputItem, 
@@ -15,8 +14,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText as generateGeminiText, generateTextWithJsonOutput as generateGeminiJson } from '../../services/geminiService';
-import { generateText as generateDeepSeekText, generateTextWithJsonOutput as generateDeepSeekJson } from '../../services/deepseekService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
 
@@ -28,7 +26,7 @@ interface BatchStoryWritingModuleProps {
 const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({ 
     moduleState, setModuleState 
 }) => {
-    const { apiSettings } = useAppContext();
+    const { consumeCredit } = useAppContext();
     const {
     inputItems, results, globalTargetLength, globalWritingStyle, globalCustomWritingStyle,
     outputLanguage, referenceViralStoryForStyle, isProcessingBatch,
@@ -38,9 +36,6 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
   const updateState = (updates: Partial<BatchStoryWritingModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
   };
-
-  const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
-  const deepseekApiKeyForService = apiSettings.provider === 'deepseek' ? apiSettings.apiKey : undefined;
 
   const handleAddItem = () => {
     const newItem: BatchStoryInputItem = {
@@ -68,23 +63,49 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     });
   };
 
+  // Helper function to call backend with JSON response
+  const generateJsonViaBackend = async <T,>(prompt: string): Promise<T> => {
+    const result = await generateTextViaBackend({
+      prompt,
+      provider: 'gemini',
+      systemInstruction: 'You are a helpful assistant that returns valid JSON.',
+    });
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate content');
+    }
+    
+    try {
+      return JSON.parse(result.text) as T;
+    } catch (e) {
+      // If parsing fails, try to extract JSON from the response
+      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]) as T;
+      }
+      throw new Error('Invalid JSON response from backend');
+    }
+  };
+
   const generateSingleStoryForBatch = async (
     item: BatchStoryInputItem,
     updateItemProgress: (updates: Partial<GeneratedBatchStoryOutputItem>) => void
   ): Promise<Omit<GeneratedBatchStoryOutputItem, 'id' | 'originalOutline'>> => {
     
-    // --- Define service functions based on provider ---
-    const textGenerator = apiSettings.provider === 'deepseek'
-        ? (prompt: string) => generateDeepSeekText(prompt, undefined, deepseekApiKeyForService)
-        : (prompt: string) => generateGeminiText(prompt, undefined, undefined, geminiApiKeyForService).then(res => res.text);
-    
-    const jsonGenerator = <T,>(prompt: string): Promise<T> => {
-        if (apiSettings.provider === 'deepseek') {
-            return generateDeepSeekJson<T>(prompt, deepseekApiKeyForService);
-        }
-        return generateGeminiJson<T>(prompt, undefined, geminiApiKeyForService);
+    // Helper function for text generation via backend
+    const textGenerator = async (prompt: string): Promise<string> => {
+      const result = await generateTextViaBackend({
+        prompt,
+        provider: 'gemini',
+        systemInstruction: 'Bạn là một nhà văn AI chuyên nghiệp.',
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate text');
+      }
+      
+      return result.text;
     };
-
 
     const currentTargetLength = item.specificTargetLength || globalTargetLength;
     let currentWritingStyle = item.specificWritingStyle || globalWritingStyle;
@@ -224,7 +245,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     }
     CHỈ TRẢ VỀ JSON.`;
     
-    const analysisResult = await jsonGenerator<EditStoryAnalysisReport>(analysisPrompt);
+    const analysisResult = await generateJsonViaBackend<EditStoryAnalysisReport>(analysisPrompt);
 
     return { 
         generatedStory: editedStory, 
@@ -239,6 +260,14 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     const validItems = inputItems.filter(item => item.outline.trim() !== '');
     if (validItems.length === 0) {
       updateState({ batchError: 'Vui lòng thêm ít nhất một dàn ý hợp lệ.' });
+      return;
+    }
+
+    // Estimate total cost: ~3 credits per story (writing + editing + analysis)
+    const totalEstimatedCost = validItems.length * 3;
+    const hasCredits = await consumeCredit(totalEstimatedCost);
+    if (!hasCredits) {
+      updateState({ batchError: `Không đủ credit! Cần ${totalEstimatedCost} credit (${validItems.length} truyện × 3 credit/truyện).` });
       return;
     }
 
@@ -322,14 +351,13 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     }
   };
 
-
   return (
     <ModuleContainer title="📚 Viết Truyện Hàng Loạt">
       <InfoBox>
-        <p><strong>💡 Hướng dẫn:</strong></p>
-        <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-sm">
+        <p><strong>💡 Thông báo:</strong> Module đã được nâng cấp để sử dụng backend proxy. Tất cả API keys được quản lý qua webadmin. Chi phí: ~3 credit/truyện (viết + biên tập + phân tích).</p>
+        <ul className="list-disc list-inside ml-4 mt-2 space-y-1 text-sm">
           <li>Thiết lập các tùy chọn chung như độ dài, phong cách viết, ngôn ngữ và truyện viral tham khảo (nếu có).</li>
-          <li><strong>(Mới)</strong> Tùy chỉnh "Số luồng xử lý đồng thời" để tăng tốc độ. Mức khuyến nghị là 3 để đảm bảo ổn định.</li>
+          <li>Tùy chỉnh "Số luồng xử lý đồng thời" để tăng tốc độ. Mức khuyến nghị là 3 để đảm bảo ổn định.</li>
           <li>Thêm từng dàn ý truyện vào danh sách. Bạn có thể tùy chỉnh độ dài và phong cách riêng cho mỗi dàn ý nếu muốn.</li>
           <li>Nhấn "Bắt Đầu Viết Hàng Loạt". AI sẽ tự động viết, biên tập và phân tích từng truyện theo số luồng bạn đã chọn.</li>
           <li>Sau khi hoàn tất, bạn có thể xem lại, sao chép từng truyện và báo cáo phân tích của nó.</li>
@@ -339,6 +367,15 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
       {/* Global Settings */}
       <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow mb-8">
         <h3 className="text-xl font-semibold text-gray-800 mb-4">Cài đặt chung cho Hàng Loạt</h3>
+        
+        <div className="p-4 border rounded-lg bg-blue-50">
+          <h4 className="text-md font-semibold text-blue-700 mb-2">💰 Chi Phí Ước Tính:</h4>
+          <p className="text-sm text-blue-600">
+            • {inputItems.filter(item => item.outline.trim()).length} truyện × 3 credit = <strong>{inputItems.filter(item => item.outline.trim()).length * 3} credit</strong><br/>
+            <span className="text-xs">(Bao gồm: viết truyện + biên tập + phân tích cho mỗi truyện)</span>
+          </p>
+        </div>
+
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div>
             <label htmlFor="bsGlobalTargetLength" className="block text-sm font-medium text-gray-700 mb-1">Độ dài truyện (chung): <span className="font-semibold text-indigo-600">{parseInt(globalTargetLength).toLocaleString()} từ</span></label>

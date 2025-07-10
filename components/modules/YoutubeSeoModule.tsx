@@ -1,7 +1,6 @@
 
 import React from 'react'; 
 import { 
-    ApiSettings, 
     YoutubeSeoModuleState, 
     ActiveSeoTabType,
     TitleAnalysisResponse,
@@ -12,7 +11,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { useAppContext } from '../../AppContext';
 
 interface YoutubeSeoModuleProps {
@@ -21,7 +20,7 @@ interface YoutubeSeoModuleProps {
 }
 
 const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ moduleState, setModuleState }) => {
-  const { apiSettings } = useAppContext(); // Use context
+  const { consumeCredit } = useAppContext();
   const {
     activeSeoTab, videoTitle, youtubeOutline, language, timelineCount, videoDuration,
     videoKeywords, youtubeDescription, youtubeTags, keywordTopic, suggestedKeywordsOutput,
