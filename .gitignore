@@ -10,7 +10,10 @@ release/
 *.asar
 .DS_Store
 
+# Environment files
+.env.local
+.env
+
 # Submodules - deploy riêng
-key-admin/
-key-manager-backend/"keyadmin/"  
-"key-manager-backend/" 
+keyadmin/
+key-manager-backend/ 
