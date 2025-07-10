@@ -1,13 +1,23 @@
-# Netlify configuration file
-# This file configures proxy redirects for the API and build settings for keyadmin.
+# Netlify configuration for keyadmin
+# Build settings and API proxy configuration
 
 [build]
-  base = "keyadmin"
-  command = "npm install && npm run build"
-  publish = "keyadmin/build"
+  command = "npm install && npm run build"  
+  publish = "build"
 
+[build.environment]
+  NODE_VERSION = "18"
+  CI = "false"
+
+# API proxy redirects to backend
 [[redirects]]
   from = "/api/*"
   to = "https://key-manager-backend.onrender.com/api/:splat"
   status = 200
   force = true
+
+# SPA routing fallback  
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

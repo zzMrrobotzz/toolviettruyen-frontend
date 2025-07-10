@@ -5,7 +5,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/geminiService';
+import { generateAiContent } from '../../services/keyService';
 import { useAppContext } from '../../AppContext';
 
 interface AnalysisModuleProps {
@@ -27,6 +27,11 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
   const handleAnalyze = async () => {
     if (!sourceText.trim()) {
       updateState({ errorAnalysis: 'Vui lòng nhập nội dung truyện để phân tích.' });
+      return;
+    }
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ errorAnalysis: 'Không đủ credit.' });
       return;
     }
     updateState({ 
@@ -57,9 +62,11 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
     \n---`;
 
     try {
-      const resultText = (await generateText(prompt)).text;
-      const factorRegex = /\[FACTOR\](.*?)\|(.*?)\|(.*?)\[\/FACTOR\]/g;
-      const suggestionRegex = /\[SUGGESTIONS\]([\s\S]*?)\[\/SUGGESTIONS\]/;
+      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      if (!result.success) throw new Error(result.error || 'AI generation failed');
+      const resultText = result.text || '';
+      const factorRegex = /\[FACTOR\](.*?)\|(.*?)\|(.*?)[\]\/FACTOR\]/g;
+      const suggestionRegex = /\[SUGGESTIONS\]([\s\S]*?)[\]\/SUGGESTIONS\]/;
       let match;
       const factors: AnalysisFactor[] = [];
       while ((match = factorRegex.exec(resultText)) !== null) {
@@ -86,8 +93,9 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
   };
 
   const handleGetGeminiSuggestions = async () => {
-     if (!sourceText.trim()) {
-      updateState({ errorImprovement: 'Vui lòng nhập nội dung truyện để Gemini đưa ra đề xuất.' });
+     const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ errorImprovement: 'Không đủ credit.' });
       return;
     }
     updateState({ 
@@ -99,14 +107,15 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
     });
 
     const prompt = `Act as a world-class developmental editor. Read the following story and provide 3-5 concrete, actionable suggestions to improve it. Focus on plot holes, character motivation, pacing, and emotional impact.
-    \n**STORY:**
-    \n---
-    \n${sourceText.trim()}
-    \n---
-    \nProvide the suggestions in a clear, bulleted list. Return only the suggestions in Vietnamese.`;
+    **STORY:**
+    ---
+    ${sourceText.trim()}
+    ---
+    Provide the suggestions in a clear, bulleted list. Return only the suggestions in Vietnamese.`;
     
     try {
-        const result = await generateText(prompt);
+        const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+        if (!result.success) throw new Error(result.error || 'AI generation failed');
         updateState({ suggestions: result.text, loadingMessage: "Nhận gợi ý Gemini hoàn tất!" });
     } catch (e) {
         updateState({ errorImprovement: `Lỗi khi nhận gợi ý từ Gemini: ${(e as Error).message}`, loadingMessage: "Lỗi nhận gợi ý Gemini." });
@@ -124,6 +133,11 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
   const handleImproveStory = async () => {
     if (!sourceText.trim() || !suggestions.trim()) {
       updateState({ errorImprovement: 'Không có dữ liệu truyện hoặc gợi ý để cải thiện.' });
+      return;
+    }
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ errorImprovement: 'Không đủ credit.' });
       return;
     }
     updateState({ 
@@ -145,7 +159,8 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
     \nHãy trả về toàn bộ kịch bản đã được cải thiện bằng tiếng Việt.`;
     
     try {
-      const result = await generateText(prompt);
+      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      if (!result.success) throw new Error(result.error || 'AI generation failed');
       updateState({ improvedStory: result.text, loadingMessage: "Cải thiện truyện hoàn tất!" });
     } catch (e) {
       updateState({ errorImprovement: `Lỗi khi cải thiện truyện: ${(e as Error).message}`, loadingMessage: "Lỗi cải thiện truyện." });
@@ -163,6 +178,11 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
   const handleAnalyzeViralOutline = async () => {
     if (!sourceText.trim()) {
       updateState({ errorViralOutline: 'Vui lòng nhập nội dung kịch bản/dàn ý để phân tích.' });
+      return;
+    }
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ errorViralOutline: 'Không đủ credit.' });
       return;
     }
     updateState({ 
@@ -189,7 +209,8 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
     Hãy trình bày kết quả phân tích một cách rõ ràng, mạch lạc, bằng tiếng Việt.`;
 
     try {
-      const result = await generateText(prompt);
+      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      if (!result.success) throw new Error(result.error || 'AI generation failed');
       updateState({ viralOutlineAnalysisResult: result.text, loadingMessage: "Phân tích Dàn Ý Viral hoàn tất!" });
     } catch (e) {
       updateState({ errorViralOutline: `Lỗi khi phân tích dàn ý viral: ${(e as Error).message}`, loadingMessage: "Lỗi phân tích Dàn Ý Viral." });

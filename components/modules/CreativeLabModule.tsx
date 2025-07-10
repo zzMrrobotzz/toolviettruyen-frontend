@@ -8,7 +8,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/geminiService';
+import { generateAiContent } from '../../services/keyService';
 import { useAppContext } from '../../AppContext';
 
 interface CreativeLabModuleProps {
@@ -49,6 +49,11 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
       updateState({ errorAnalyzingReferenceOutline: 'Vui lòng nhập "Dàn Ý Viral Tham Khảo" để phân tích.' });
       return;
     }
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ errorAnalyzingReferenceOutline: 'Không đủ credit.' });
+      return;
+    }
     updateState({ 
       isAnalyzingReferenceOutline: true, 
       errorAnalyzingReferenceOutline: null, 
@@ -64,7 +69,7 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     - Việc sử dụng xung đột, căng thẳng (tension), và các yếu tố bất ngờ (twists), cliffhangers.
     - Nhịp độ (pacing) của câu chuyện qua các phần của dàn ý.
     - Cách mở đầu và kết thúc gây ấn tượng.
-    - Các yếu tố đặc biệt nào làm cho dàn ý này có khả năng viral hoặc thu hút khán giả.
+    - Các yếu tố đặc biệt nào làm cho dàn ý này có khả năng viral ho��c thu hút khán giả.
 
     Toàn bộ phân tích phải được viết bằng ngôn ngữ: ${selectedOutputLangLabel}.
 
@@ -75,7 +80,8 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     Chỉ trả về nội dung phân tích, không thêm lời chào hay giới thiệu.`;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
+      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      if (!result.success) throw new Error(result.error || 'AI generation failed');
       updateState({ 
         referenceOutlineAnalysisResult: result.text, 
         isAnalyzingReferenceOutline: false 
@@ -92,6 +98,11 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
   const handleGenerateQuickOutline = async () => {
     if (!quickOutlineTitle.trim()) {
       updateState({ quickOutlineError: 'Vui lòng nhập Tiêu đề truyện.' });
+      return;
+    }
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ quickOutlineError: 'Không đủ credit.' });
       return;
     }
     updateState({ quickOutlineError: null, quickOutlineResult: '', quickOutlineLoading: true, quickOutlineProgressMessage: 'Đang tạo dàn ý nhanh...' });
@@ -125,7 +136,8 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     -   Toàn bộ dàn ý cuối cùng phải được viết bằng ngôn ngữ ${selectedOutputLangLabel}. Không thêm bất kỳ lời bình hay giới thiệu nào ngoài dàn ý.`;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
+      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      if (!result.success) throw new Error(result.error || 'AI generation failed');
       updateState({ quickOutlineResult: result.text, quickOutlineLoading: false, quickOutlineProgressMessage: 'Hoàn thành!' });
       setTimeout(() => setModuleState(prev => prev.quickOutlineProgressMessage === 'Hoàn thành!' ? {...prev, quickOutlineProgressMessage: null} : prev ), 3000);
     } catch (e) {
@@ -136,6 +148,11 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
   const handleGenerateSingleOutlineInDepth = async () => {
     if (!coreIdea.trim()) {
       updateState({ singleOutlineError: 'Vui lòng nhập Ý tưởng Cốt lõi.' });
+      return;
+    }
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ singleOutlineError: 'Không đủ credit.' });
       return;
     }
     updateState({ singleOutlineError: null, finalOutline: '', singleOutlineLoading: true, singleOutlineProgressMessage: 'Đang tạo dàn ý chuyên sâu...' });
@@ -193,7 +210,8 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     `;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
+      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      if (!result.success) throw new Error(result.error || 'AI generation failed');
       updateState({ finalOutline: result.text, singleOutlineLoading: false, singleOutlineProgressMessage: 'Hoàn thành!' });
       setTimeout(() => setModuleState(prev => prev.singleOutlineProgressMessage === 'Hoàn thành!' ? {...prev, singleOutlineProgressMessage: null} : prev ), 3000);
     } catch (e) {
@@ -286,7 +304,8 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     -   Đảm bảo dàn ý logic, hấp dẫn.
     -   Toàn bộ dàn ý cuối cùng phải được viết bằng ngôn ngữ ${selectedOutputLangLabel}. Không thêm bất kỳ lời bình hay giới thiệu nào ngoài dàn ý.
     `;
-    const result = await generateText(prompt, undefined, undefined, geminiApiKeyForService);
+    const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+    if (!result.success) throw new Error(result.error || 'AI generation failed');
     return result.text;
   };
 
