@@ -12,4 +12,5 @@ release/
 
 # Submodules - deploy riêng
 key-admin/
-key-manager-backend/
+key-manager-backend/"keyadmin/"  
+"key-manager-backend/" 
