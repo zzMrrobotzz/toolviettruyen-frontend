@@ -2,7 +2,7 @@
 
 [build]
   command = "npm run build"
-  publish = "build"
+  publish = "dist"
 
 # Cấu hình chuyển hướng (proxy) cho các API call
 [[redirects]]
