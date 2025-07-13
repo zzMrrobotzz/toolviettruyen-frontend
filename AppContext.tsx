@@ -76,7 +76,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const consumeCredit = useCallback(async (cost: number = 1): Promise<boolean> => {
-    if (!keyInfo || keyInfo.credit < cost) {
+    const keyToUse = keyInfo?.key || localStorage.getItem('user_key');
+    console.log('Gọi use-credit với:', { key: keyToUse, amount: cost });
+    if (!keyToUse || !keyInfo || keyInfo.credit < cost) {
       setError('Bạn không đủ credit để thực hiện hành động này.');
       return false;
     }
@@ -87,7 +89,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const response = await fetch('/api/keys/use-credit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: keyInfo.key, amount: cost }),
+        body: JSON.stringify({ key: keyToUse, amount: cost }),
       });
 
       const data = await response.json();
