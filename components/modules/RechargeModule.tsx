@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Button, Row, Col, Typography, Spin, Modal } from 'antd';
 import axios from 'axios';
-import { API_BASE_URL_URL } from '../../config';
+import { API_BASE_URL } from '../../config';
 import QRCodeWrapper from './QRCodeWrapper';
 
 const PRICING = [
@@ -107,7 +107,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
                 bordered
                 title={pkg.label}
               >
-                <div style={{ fontSize: 18, marginBottom: 8 }}><b>{pkg.price.toLocaleString()} VNĐ</b></div>
+                <div style={{ fontSize: 18, marginBottom: 8 }}><b>{(pkg.price || 0).toLocaleString()} VNĐ</b></div>
                 <Button
                   type="primary"
                   loading={paying}

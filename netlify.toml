@@ -1,22 +1,27 @@
-# Netlify configuration for main frontend app
-# Build settings and API proxy configuration
+# Cấu hình cho Netlify để build trang admin
 
 [build]
-  command = "npm install && npm run build"  
-  publish = "dist"
+  # Thư mục gốc của trang admin
+  base = "keyadmin/"
+  
+  # Lệnh để cài đặt và build trang admin
+  command = "npm install && npm run build"
+  
+  # Thư mục chứa kết quả sau khi build
+  publish = "keyadmin/build/"
 
-[build.environment]
-  NODE_VERSION = "18"
-  CI = "false"
-
-# API proxy redirects to backend
+# Cấu hình chuyển hướng (proxy) cho các API call
 [[redirects]]
+  # Bất kỳ request nào bắt đầu bằng /api/
   from = "/api/*"
-  to = "https://key-manager-backend.onrender.com/api/:splat"
+  
+  # Sẽ được chuyển hướng đến backend server của bạn
+  to = "https://key-manager-backend.onrender.com/:splat"
+  
+  # Status 200 để làm proxy, không phải redirect
   status = 200
-  force = true
 
-# SPA routing fallback  
+# Quy tắc này đảm bảo routing phía client của React hoạt động
 [[redirects]]
   from = "/*"
   to = "/index.html"

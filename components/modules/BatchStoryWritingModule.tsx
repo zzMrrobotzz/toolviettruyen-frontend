@@ -378,7 +378,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div>
-            <label htmlFor="bsGlobalTargetLength" className="block text-sm font-medium text-gray-700 mb-1">Độ dài truyện (chung): <span className="font-semibold text-indigo-600">{parseInt(globalTargetLength).toLocaleString()} từ</span></label>
+            <label htmlFor="bsGlobalTargetLength" className="block text-sm font-medium text-gray-700 mb-1">Độ dài truyện (chung): <span className="font-semibold text-indigo-600">{parseInt(globalTargetLength || '0').toLocaleString()} từ</span></label>
             <input type="range" id="bsGlobalTargetLength" min={STORY_LENGTH_OPTIONS[0].value} max={STORY_LENGTH_OPTIONS[STORY_LENGTH_OPTIONS.length - 1].value} step="500" value={globalTargetLength} onChange={(e) => updateState({ globalTargetLength: e.target.value })} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" disabled={isProcessingBatch}/>
           </div>
           <div>
@@ -442,7 +442,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
                     <div>
                         <label htmlFor={`specificLength-${item.id}`} className="block text-xs font-medium text-gray-600 mb-0.5">Mục tiêu độ dài riêng:</label>
                         <select id={`specificLength-${item.id}`} value={item.specificTargetLength || ""} onChange={(e) => handleInputChange(item.id, 'specificTargetLength', e.target.value || null)} className="w-full p-2 border border-gray-300 rounded-md text-xs" disabled={isProcessingBatch}>
-                            <option value="">-- Dùng cài đặt chung ({parseInt(globalTargetLength).toLocaleString()} từ) --</option>
+                            <option value="">-- Dùng cài đặt chung ({parseInt(globalTargetLength || '0').toLocaleString()} từ) --</option>
                             {STORY_LENGTH_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
                     </div>

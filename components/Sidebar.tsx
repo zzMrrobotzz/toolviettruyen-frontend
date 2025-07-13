@@ -39,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule }) => {
       {keyInfo && (
         <div className="p-4 mt-4 border-t border-slate-700 text-center text-xs">
           <p>Key: <span className="font-mono">{keyInfo.key}</span></p>
-          <p>Credits: <span className="font-bold text-yellow-400">{keyInfo.credit.toLocaleString()}</span></p>
+          <p>Credits: <span className="font-bold text-yellow-400">{(keyInfo.credit || 0).toLocaleString()}</span></p>
         </div>
       )}
     </aside>

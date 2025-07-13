@@ -100,7 +100,7 @@ const EditStoryModule: React.FC<EditStoryModuleProps> = () => {
 
         <div>
           <label htmlFor="targetLength" className="block text-sm font-medium text-gray-700 mb-1">
-            Mục tiêu độ dài sau biên tập: {parseInt(targetLength).toLocaleString()} từ
+            Mục tiêu độ dài sau biên tập: {parseInt(targetLength || '0').toLocaleString()} từ
           </label>
           <input
             type="range"

@@ -615,7 +615,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ moduleState, setMod
             <div>
                 <label htmlFor="wsTargetLength" className="block text-sm font-medium text-gray-700 mb-1">Độ dài truyện (mục tiêu):</label>
                 <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-semibold text-indigo-600">{parseInt(targetLength).toLocaleString()} từ</span>
+                    <span className="text-sm font-semibold text-indigo-600">{parseInt(targetLength || '0').toLocaleString()} từ</span>
                 </div>
                 <input 
                     type="range" 
@@ -632,7 +632,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ moduleState, setMod
                     <span>Ngắn</span>
                     <span>Dài</span>
                 </div>
-                 <p className="text-xs text-gray-500 mt-1">Truyện sẽ được biên tập để đạt ~{parseInt(targetLength).toLocaleString()} từ (±10%).</p>
+                 <p className="text-xs text-gray-500 mt-1">Truyện sẽ được biên tập để đạt ~{parseInt(targetLength || '0').toLocaleString()} từ (±10%).</p>
             </div>
             <div>
                 <label htmlFor="wsWritingStyle" className="block text-sm font-medium text-gray-700 mb-1">Phong cách viết truyện (chung):</label>

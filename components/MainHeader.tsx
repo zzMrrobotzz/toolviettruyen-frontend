@@ -21,7 +21,7 @@ const MainHeader: React.FC = () => {
         <div className="absolute top-4 right-4 flex items-center space-x-4">
           <div className="flex items-center bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 text-lg font-semibold">
             <FaCoins className="text-yellow-400 mr-2" />
-            <span>{keyInfo.credit.toLocaleString()} Credits</span>
+            <span>{(keyInfo.credit || 0).toLocaleString()} Credits</span>
           </div>
           <button 
             onClick={logout}
