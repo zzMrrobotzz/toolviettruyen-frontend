@@ -1,14 +1,8 @@
 # Cấu hình cho Netlify để build trang admin
 
 [build]
-  # Thư mục gốc của trang admin
-  base = "keyadmin/"
-  
-  # Lệnh để cài đặt và build trang admin
-  command = "npm install && npm run build"
-  
-  # Thư mục chứa kết quả sau khi build
-  publish = "keyadmin/build/"
+  command = "npm run build"
+  publish = "build"
 
 # Cấu hình chuyển hướng (proxy) cho các API call
 [[redirects]]
