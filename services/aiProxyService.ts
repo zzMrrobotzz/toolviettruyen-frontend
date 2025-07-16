@@ -1,30 +1,23 @@
+import { API_BASE_URL } from '../config';
+
 export interface AIRequest {
   prompt: string;
-  systemInstruction?: string;
-  provider: 'gemini' | 'openai' | 'deepseek';
+  provider: string;
   model?: string;
-  useGoogleSearch?: boolean;
-  options?: {
-    temperature?: number;
-    maxTokens?: number;
-    topP?: number;
-  };
+  temperature?: number;
+  maxTokens?: number;
 }
 
 export interface AIResponse {
   success: boolean;
   text?: string;
   error?: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
+  remainingCredits?: number;
 }
 
 export const generateTextViaBackend = async (request: AIRequest): Promise<AIResponse> => {
   try {
-    const response = await fetch('/api/ai/generate', {
+    const response = await fetch(`${API_BASE_URL}/ai/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

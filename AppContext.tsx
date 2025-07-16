@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { KeyInfo, ApiSettings, ApiProvider } from './types';
 import { DEFAULT_API_PROVIDER } from './constants';
+import { API_BASE_URL } from './config';
 
 interface AppContextType {
   keyInfo: KeyInfo | null;
@@ -45,7 +46,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/keys/validate', {
+      const response = await fetch(`${API_BASE_URL}/keys/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key }),
@@ -86,7 +87,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const optimisticKeyInfo = { ...keyInfo, credit: keyInfo.credit - cost };
       setKeyInfo(optimisticKeyInfo);
 
-      const response = await fetch('/api/keys/use-credit', {
+      const response = await fetch(`${API_BASE_URL}/keys/use-credit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: keyToUse, amount: cost }),
@@ -117,7 +118,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const getAvailableAIProviders = useCallback(async (): Promise<string[]> => {
     try {
-      const response = await fetch('/api/providers', {
+      const response = await fetch(`${API_BASE_URL}/providers`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
