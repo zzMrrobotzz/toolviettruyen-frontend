@@ -1,6 +1,6 @@
-
 import React from 'react'; 
 import { 
+    ApiSettings, 
     YoutubeSeoModuleState, 
     ActiveSeoTabType,
     TitleAnalysisResponse,
@@ -11,16 +11,15 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextViaBackend } from '../../services/aiProxyService';
-import { useAppContext } from '../../AppContext';
+import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
 
 interface YoutubeSeoModuleProps {
+  apiSettings: ApiSettings;
   moduleState: YoutubeSeoModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<YoutubeSeoModuleState>>;
 }
 
-const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ moduleState, setModuleState }) => {
-  const { consumeCredit } = useAppContext();
+const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
   const {
     activeSeoTab, videoTitle, youtubeOutline, language, timelineCount, videoDuration,
     videoKeywords, youtubeDescription, youtubeTags, keywordTopic, suggestedKeywordsOutput,
@@ -39,8 +38,8 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ moduleState, setMod
   const getSelectedLanguageLabel = () => HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === language)?.label || language;
   
   // Helper function for backend text generation
-  const generateTextViaBackendHelper = async (prompt: string, systemInstruction?: string): Promise<string> => {
-    const result = await generateTextViaBackend({
+  const generateTextHelper = async (prompt: string, systemInstruction?: string): Promise<string> => {
+    const result = await generateText({
       prompt,
       provider: 'gemini',
       systemInstruction: systemInstruction || 'You are a YouTube SEO expert.',
@@ -55,7 +54,7 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ moduleState, setMod
 
   // Helper function for JSON generation via backend
   const generateJsonViaBackend = async <T,>(prompt: string): Promise<T> => {
-    const result = await generateTextViaBackend({
+    const result = await generateText({
       prompt,
       provider: 'gemini',
       systemInstruction: 'You are a helpful assistant that returns valid JSON.',
@@ -81,12 +80,6 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ moduleState, setMod
     if (!videoTitle.trim()) { updateState({ error: 'Vui lòng nhập tiêu đề video!' }); return; }
     if (!youtubeOutline.trim()) { updateState({ error: 'Vui lòng nhập dàn ý để tạo timeline!' }); return; }
 
-    const hasCredits = await consumeCredit(2);
-    if (!hasCredits) {
-      updateState({ error: 'Không đủ credit! Cần 2 credit để tạo mô tả & timeline.' });
-      return;
-    }
-    
     updateState({ error: null, currentResult: '', youtubeDescription: '', youtubeTags: '', loadingMessage: 'Đang tạo mô tả & timeline theo cấu trúc mới...' });
 
     const selectedLangLabel = getSelectedLanguageLabel(); // e.g., "Tiếng Hàn"
@@ -139,7 +132,7 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
 `;
     
     try {
-      const resultText = await generateTextViaBackendHelper(prompt, 'You are a YouTube SEO expert and creative writer.');
+      const resultText = await generateTextHelper(prompt, 'You are a YouTube SEO expert and creative writer.');
       let descriptionText = resultText;
       const tagMatch = descriptionText.match(/\[TAGS\]([\s\S]*?)\[\/TAGS\]/);
       let tagsResult = '';
@@ -164,12 +157,6 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
   const handleSuggestKeywords = async () => {
     if (!keywordTopic.trim()) { updateState({ error: 'Vui lòng nhập Chủ đề chính của Video.' }); return; }
 
-    const hasCredits = await consumeCredit(1);
-    if (!hasCredits) {
-      updateState({ error: 'Không đủ credit! Cần 1 credit để tìm từ khóa.' });
-      return;
-    }
-
     updateState({ error: null, currentResult: '', suggestedKeywordsOutput: '', loadingMessage: 'Đang tìm từ khóa liên quan...' });
 
     const selectedLangLabel = getSelectedLanguageLabel();
@@ -178,7 +165,7 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
     Format the output clearly with headings for "Từ khóa Ngắn (Short Keywords):" and "Từ khóa Dài (Long-tail Keywords):". Each keyword on a new line.`;
 
     try {
-      const resultText = await generateTextViaBackendHelper(prompt);
+      const resultText = await generateTextHelper(prompt);
       updateState({ suggestedKeywordsOutput: resultText, currentResult: resultText, loadingMessage: "Tìm từ khóa hoàn tất!" });
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tìm từ khóa." }); 
@@ -196,12 +183,6 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
   const handleGenerateChapters = async () => {
     if (!chapterScript.trim()) { updateState({ error: 'Vui lòng nhập Kịch bản Video.' }); return; }
 
-    const hasCredits = await consumeCredit(1);
-    if (!hasCredits) {
-      updateState({ error: 'Không đủ credit! Cần 1 credit để tạo chapter.' });
-      return;
-    }
-
     updateState({ error: null, currentResult: '', generatedChapters: '', loadingMessage: 'Đang tạo chapter markers...' });
 
     const selectedLangLabel = getSelectedLanguageLabel();
@@ -211,7 +192,7 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
     Distribute the chapters logically throughout the video. Each chapter should be in the format 'HH:MM:SS - Chapter Title in ${selectedLangLabel}' or 'MM:SS - Chapter Title in ${selectedLangLabel}'. Ensure the final chapter does not exceed the total video duration. List each chapter on a new line. Only return the list of chapters.`;
     
     try {
-      const resultText = await generateTextViaBackendHelper(prompt);
+      const resultText = await generateTextHelper(prompt);
       updateState({ generatedChapters: resultText, currentResult: resultText, loadingMessage: "Tạo chapter hoàn tất!" });
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo chapter." }); 
@@ -229,12 +210,6 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
   const handleAnalyzeAndScoreTitle = async () => {
     if (!titleForAnalysis.trim()) {
       updateState({ errorTitleOptimizer: 'Vui lòng nhập tiêu đề cần phân tích.' });
-      return;
-    }
-
-    const hasCredits = await consumeCredit(1);
-    if (!hasCredits) {
-      updateState({ errorTitleOptimizer: 'Không đủ credit! Cần 1 credit để phân tích tiêu đề.' });
       return;
     }
 
@@ -291,12 +266,6 @@ Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để khôn
     const currentTitle = titleForAnalysis.trim() || videoTitle.trim(); // Use analyzed title or main video title
     if (!currentTitle) {
       updateState({ errorTitleOptimizer: 'Không có tiêu đề video để làm cơ sở gợi ý text thumbnail.' });
-      return;
-    }
-
-    const hasCredits = await consumeCredit(1);
-    if (!hasCredits) {
-      updateState({ errorTitleOptimizer: 'Không đủ credit! Cần 1 credit để gợi ý text thumbnail.' });
       return;
     }
 
