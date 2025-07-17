@@ -11,7 +11,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 
 interface YoutubeSeoModuleProps {
   apiSettings: ApiSettings;
@@ -39,36 +39,35 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, module
   
   // Helper function for backend text generation
   const generateTextHelper = async (prompt: string, systemInstruction?: string): Promise<string> => {
-    const result = await generateText({
+    const result = await generateTextViaBackend({
       prompt,
       provider: 'gemini',
-      systemInstruction: systemInstruction || 'You are a YouTube SEO expert.',
-    });
-    
+      model: undefined,
+      temperature: undefined,
+      maxTokens: undefined
+    }, () => {});
     if (!result.success) {
       throw new Error(result.error || 'Failed to generate content');
     }
-    
-    return result.text;
+    return result.text || '';
   };
 
   // Helper function for JSON generation via backend
   const generateJsonViaBackend = async <T,>(prompt: string): Promise<T> => {
-    const result = await generateText({
+    const result = await generateTextViaBackend({
       prompt,
       provider: 'gemini',
-      systemInstruction: 'You are a helpful assistant that returns valid JSON.',
-    });
-    
+      model: undefined,
+      temperature: undefined,
+      maxTokens: undefined
+    }, () => {});
     if (!result.success) {
       throw new Error(result.error || 'Failed to generate content');
     }
-    
     try {
-      return JSON.parse(result.text) as T;
+      return JSON.parse(result.text || '') as T;
     } catch (e) {
-      // If parsing fails, try to extract JSON from the response
-      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+      const jsonMatch = (result.text || '').match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]) as T;
       }
@@ -106,7 +105,7 @@ ${youtubeOutline}
 ${videoTitle}
 [AI: Generate a compelling 1-2 sentence hook/introductory paragraph based on the Story Outline. This hook MUST be written EXCLUSIVELY in ${selectedLangLabel}. ${exampleLanguageDisclaimer} Example: "Khi quyền lực trở thành vũ khí tàn nhẫn, mẹ chồng sẵn sàng dồn con dâu vào đường cùng. Nhưng bà không ngờ, cô con dâu tưởng chừng yếu đuối ấy lại nắm giữ bí mật có thể lật ngược thế cờ, quyết định vận mệnh của cả gia tộc!"]
 
-Hãy Cùng Lắng Nghe Câu Truyện Đầy Cảm Xúc Này và đừng quên để lại suy nghĩ của bạn bên dưới bình luận nhé.
+Hãy Cùng Lắng Nghe Câu Chuyện Đầy Cảm Xúc Này và đừng quên để lại suy nghĩ của bạn bên dưới bình luận nhé.
 
 TIMELINE: ${videoTitle}
 [AI: Generate EXACTLY ${timelineCount} timeline entries. Each entry MUST be on a new line.
