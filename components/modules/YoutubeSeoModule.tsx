@@ -1,6 +1,7 @@
   // ...existing code...
 
-import React from 'react';
+
+import React from 'react'; 
 import { 
     ApiSettings, 
     YoutubeSeoModuleState, 
@@ -13,7 +14,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextViaBackend } from '../../services/aiProxyService';
+import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
 
 interface YoutubeSeoModuleProps {
   apiSettings: ApiSettings;
@@ -22,33 +23,7 @@ interface YoutubeSeoModuleProps {
 }
 
 const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
-  // Hàm xử lý gợi ý từ khóa liên quan cho tab 'Từ khóa'
-  const handleSuggestKeywords = async () => {
-    if (!keywordTopic.trim()) {
-      updateState({ error: 'Vui lòng nhập Chủ đề chính của Video.' });
-      return;
-    }
-
-    updateState({ error: null, currentResult: '', suggestedKeywordsOutput: '', loadingMessage: 'Đang tìm từ khóa liên quan...' });
-
-    const selectedLangLabel = getSelectedLanguageLabel();
-    const prompt = `Bạn là chuyên gia nghiên cứu từ khóa YouTube. Hãy liệt kê 10-20 từ khóa liên quan nhất cho chủ đề sau, tối ưu SEO, không lặp lại, chỉ trả về danh sách từ khóa, không thêm giải thích, không thêm tag, không thêm ký tự đặc biệt. Chủ đề: ${keywordTopic}. Ngôn ngữ: ${selectedLangLabel}.`;
-
-    try {
-      const resultText = await generateTextHelper(prompt);
-      updateState({ suggestedKeywordsOutput: resultText, currentResult: resultText, loadingMessage: 'Tìm từ khóa hoàn tất!' });
-    } catch (e) {
-      updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: 'Lỗi tìm từ khóa.' });
-    } finally {
-      setTimeout(() => {
-        setModuleState(prev =>
-          (prev.loadingMessage?.includes('hoàn tất') || prev.loadingMessage?.includes('Lỗi'))
-            ? { ...prev, loadingMessage: null }
-            : prev
-        );
-      }, 3000);
-    }
-  };
+  // Destructure state và khai báo các hàm tiện ích
   const {
     activeSeoTab, videoTitle, youtubeOutline, language, timelineCount, videoDuration,
     videoKeywords, youtubeDescription, youtubeTags, keywordTopic, suggestedKeywordsOutput,
@@ -63,80 +38,85 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, module
   const updateState = (updates: Partial<YoutubeSeoModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
   };
-  
+
   const getSelectedLanguageLabel = () => HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === language)?.label || language;
-  
-  // Helper function for backend text generation
-  const generateTextHelper = async (prompt: string, systemInstruction?: string): Promise<string> => {
-    const result = await generateTextViaBackend({
-      prompt,
-      provider: 'gemini',
-      model: undefined,
-      temperature: undefined,
-      maxTokens: undefined
-    }, () => {});
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to generate content');
-    }
-    return result.text || '';
-  };
-
-  // Helper function for JSON generation via backend
-  const generateJsonViaBackend = async <T,>(prompt: string): Promise<T> => {
-    const result = await generateTextViaBackend({
-      prompt,
-      provider: 'gemini',
-      model: undefined,
-      temperature: undefined,
-      maxTokens: undefined
-    }, () => {});
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to generate content');
-    }
-    try {
-      return JSON.parse(result.text || '') as T;
-    } catch (e) {
-      const jsonMatch = (result.text || '').match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]) as T;
-      }
-      throw new Error('Invalid JSON response from backend');
-    }
-  };
-
   const handleGenerateDescription = async () => {
     if (!videoTitle.trim()) { updateState({ error: 'Vui lòng nhập tiêu đề video!' }); return; }
     if (!youtubeOutline.trim()) { updateState({ error: 'Vui lòng nhập dàn ý để tạo timeline!' }); return; }
-
     updateState({ error: null, currentResult: '', youtubeDescription: '', youtubeTags: '', loadingMessage: 'Đang tạo mô tả & timeline theo cấu trúc mới...' });
 
+    const selectedLangLabel = getSelectedLanguageLabel();
+
+    const prompt = `
+You are a YouTube SEO expert. Your task is to generate a complete YouTube description based on the provided inputs and a strict output structure.
+**CRITICAL LANGUAGE REQUIREMENT: Your entire output for the placeholders must be in the target language: ${selectedLangLabel}.** Do not mix in any other languages like Vietnamese or English unless that is the target language.
+
+**INPUTS:**
+- Video Title: "${videoTitle}"
+- Target Language: "${selectedLangLabel}"
+- Main Keywords (for context): "${videoKeywords || 'Not provided'}"
+- Video Duration: ${videoDuration} minutes
+- Story Outline (for context):
+---
+${youtubeOutline}
+---
+
+**OUTPUT STRUCTURE (Fill placeholders in ${selectedLangLabel}):**
+
+${videoTitle}
+[AI: Generate a compelling 1-2 sentence hook/introductory paragraph here.]
+
+[AI: Generate a sentence inviting users to listen and comment here. (For context, a Vietnamese equivalent is "Hãy Cùng Lắng Nghe Câu Truyện Đầy Cảm Xúc Này và đừng quên để lại suy nghĩ của bạn bên dưới bình luận nhé.").]
+
+TIMELINE: ${videoTitle}
+[AI: Generate EXACTLY ${timelineCount} timeline entries here. Each on a new line.
+Format: Use HH:MM:SS for videos >= 60 mins, MM:SS for videos < 60 mins.
+Example: "00:00 - [Short, catchy description]". Distribute timestamps logically based on the video duration.]
+
+[AI: Generate a call-to-action sentence here, asking users to Like, Subscribe to channel "[TÊN KÊNH CỦA BẠN]", and Comment. IMPORTANT: The phrase "[TÊN KÊNH CỦA BẠN]" must be kept exactly as is, it's a placeholder.]
+
+[AI: Generate 5 relevant hashtags here. Each on a new line, starting with #.]
+
+[TAGS][AI: Generate 15-20 relevant SEO tags here, separated by commas.][/TAGS]
+
+**MANDATORY FINAL CHECK:** Ensure all [AI: ...] parts are filled in ${selectedLangLabel} and the [TAGS] block is the very last thing in the output.
+`;
+    
+    try {
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
+      let descriptionText = result.text;
+      const tagMatch = descriptionText.match(/\[TAGS\]([\s\S]*?)\[\/TAGS\]/);
+      let tagsResult = '';
+      if (tagMatch && tagMatch[1]) {
+          tagsResult = tagMatch[1].trim();
+          descriptionText = descriptionText.replace(tagMatch[0], '').trim();
+      }
+      updateState({ youtubeDescription: descriptionText, youtubeTags: tagsResult, currentResult: descriptionText, loadingMessage: "Tạo mô tả & timeline theo cấu trúc mới hoàn tất!" });
+    } catch (e) { 
+        updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo mô tả (cấu trúc mới)." }); 
+    } finally { 
+        setTimeout(() => {
+            setModuleState(prev => 
+            (prev.loadingMessage?.includes("hoàn tất") || prev.loadingMessage?.includes("Lỗi")) 
+            ? {...prev, loadingMessage: null} 
+            : prev
+            )
+        }, 3000);
+    }
+  };
+
+  const handleSuggestKeywords = async () => {
+    if (!keywordTopic.trim()) { updateState({ error: 'Vui lòng nhập Chủ đề chính của Video.' }); return; }
+    updateState({ error: null, currentResult: '', suggestedKeywordsOutput: '', loadingMessage: 'Đang tìm từ khóa liên quan...' });
 
     const selectedLangLabel = getSelectedLanguageLabel();
-    const prompt = `
-Bạn là chuyên gia SEO YouTube và copywriter sáng tạo. Hãy tạo một mô tả video hoàn chỉnh, tối ưu SEO, bao gồm cả timeline, hashtag, tag... Dựa trên thông tin sau:
-- Tiêu đề video: ${videoTitle}
-- Từ khóa chính: ${videoKeywords || 'Không có'}
-- Thời lượng video: ${videoDuration} phút
-- Dàn ý/Nội dung chính:
-${youtubeOutline}
-
-YÊU CẦU QUAN TRỌNG:
-- Toàn bộ nội dung AI sinh ra (mô tả, timeline, hashtag, tag, lời mời...) PHẢI hoàn toàn bằng ${selectedLangLabel}.
-- KHÔNG được sử dụng bất kỳ ngôn ngữ nào khác ngoài ${selectedLangLabel}.
-- KHÔNG được chèn bất kỳ tag, tiêu đề, nhãn, ký tự đặc biệt nào như <HOOK>, <DESCRIPTION>, <INVITE>, <TIMELINE>, <CALL_TO_ACTION>, <HASHTAGS>, <TAGS>... vào kết quả.
-- KHÔNG được thêm hướng dẫn, chú thích, hoặc bất kỳ dòng giải thích nào.
-- Chỉ trả về văn bản hoàn chỉnh, sạch, đúng chuẩn SEO, sẵn sàng để copy lên YouTube.
-- Các phần nên cách nhau bằng 1 dòng trống.
-
-Hãy bắt đầu bằng đoạn hook hấp dẫn, sau đó là mô tả chi tiết, lời mời xem video, timeline, call-to-action, hashtag và tag phù hợp. Tất cả đều phải tự nhiên, đúng ngữ pháp, không lặp lại tiêu đề hoặc dàn ý.
-`;
-
-
-
+    const prompt = `You are a YouTube SEO keyword research expert. Based on the video topic: "${keywordTopic}", please suggest a comprehensive list of 15-20 relevant SEO keywords and 5-7 long-tail keywords. 
+    Provide the keywords in ${selectedLangLabel}. 
+    Format the output clearly with headings for "Từ khóa Ngắn (Short Keywords):" and "Từ khóa Dài (Long-tail Keywords):". Each keyword on a new line.`;
 
     try {
-      const resultText = await generateTextHelper(prompt);
-      updateState({ suggestedKeywordsOutput: resultText, currentResult: resultText, loadingMessage: "Tìm từ khóa hoàn tất!" });
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
+      updateState({ suggestedKeywordsOutput: result.text, currentResult: result.text, loadingMessage: "Tìm từ khóa hoàn tất!" });
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tìm từ khóa." }); 
     } finally { 
@@ -152,7 +132,6 @@ Hãy bắt đầu bằng đoạn hook hấp dẫn, sau đó là mô tả chi ti�
 
   const handleGenerateChapters = async () => {
     if (!chapterScript.trim()) { updateState({ error: 'Vui lòng nhập Kịch bản Video.' }); return; }
-
     updateState({ error: null, currentResult: '', generatedChapters: '', loadingMessage: 'Đang tạo chapter markers...' });
 
     const selectedLangLabel = getSelectedLanguageLabel();
@@ -162,8 +141,8 @@ Hãy bắt đầu bằng đoạn hook hấp dẫn, sau đó là mô tả chi ti�
     Distribute the chapters logically throughout the video. Each chapter should be in the format 'HH:MM:SS - Chapter Title in ${selectedLangLabel}' or 'MM:SS - Chapter Title in ${selectedLangLabel}'. Ensure the final chapter does not exceed the total video duration. List each chapter on a new line. Only return the list of chapters.`;
     
     try {
-      const resultText = await generateTextHelper(prompt);
-      updateState({ generatedChapters: resultText, currentResult: resultText, loadingMessage: "Tạo chapter hoàn tất!" });
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
+      updateState({ generatedChapters: result.text, currentResult: result.text, loadingMessage: "Tạo chapter hoàn tất!" });
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo chapter." }); 
     } finally { 
@@ -182,7 +161,6 @@ Hãy bắt đầu bằng đoạn hook hấp dẫn, sau đó là mô tả chi ti�
       updateState({ errorTitleOptimizer: 'Vui lòng nhập tiêu đề cần phân tích.' });
       return;
     }
-
     updateState({ 
         errorTitleOptimizer: null, 
         loadingTitleOptimizer: true,
@@ -212,7 +190,7 @@ Hãy bắt đầu bằng đoạn hook hấp dẫn, sau đó là mô tả chi ti�
         Ensure the JSON is valid. Do not include any text outside this JSON structure.`;
 
     try {
-        const result = await generateJsonViaBackend<TitleAnalysisResponse>(prompt);
+        const result = await generateTextWithJsonOutput<TitleAnalysisResponse>(prompt, undefined, apiSettings);
         updateState({
             titleAnalysisScore: result.score,
             titleAnalysisFeedback: result.feedback,
@@ -261,7 +239,7 @@ Hãy bắt đầu bằng đoạn hook hấp dẫn, sau đó là mô tả chi ti�
         Ensure the JSON is valid. Do not include any text outside this JSON structure.`;
     
     try {
-        const result = await generateJsonViaBackend<ThumbnailTextResponse>(prompt);
+        const result = await generateTextWithJsonOutput<ThumbnailTextResponse>(prompt, undefined, apiSettings);
         updateState({
             thumbnailTextSuggestions: result.thumbnail_texts,
             loadingTitleOptimizer: false,
