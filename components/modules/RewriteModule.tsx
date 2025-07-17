@@ -146,7 +146,9 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ moduleState, setModuleSta
 
   // ... (Render logic remains the same)
   return (
-    // ... JSX
+    <div>
+      {/* ... JSX */}
+    </div>
   );
 };
 
