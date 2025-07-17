@@ -86,7 +86,7 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, module
     // Clarify that examples are for structure/content type, not for language.
     const exampleLanguageDisclaimer = `(The following example is illustrative of content and structure only; your actual output for this section MUST be in ${selectedLangLabel}.)`;
 
-    const prompt = `
+-    const prompt = `
 You are a YouTube SEO expert and a creative writer. Your task is to generate a complete and optimized video description, including a timeline, strictly following the format provided below.
 **CRITICAL LANGUAGE REQUIREMENT: All AI-generated text (the hook, timeline descriptions, hashtags, and tags) MUST be exclusively in ${selectedLangLabel}. No other languages, including Vietnamese or English, are permitted in these generated sections, unless ${selectedLangLabel} itself is English or Vietnamese.**
 
@@ -98,37 +98,20 @@ You are a YouTube SEO expert and a creative writer. Your task is to generate a c
 ---
 ${youtubeOutline}
 ---
-(Note: The Story Outline/Main Content above may be in a language different from ${selectedLangLabel}. You must understand its meaning and use it as context to generate the required sections EXCLUSIVELY in ${selectedLangLabel}.)
+  (Note: The Story Outline/Main Content above may be in a language different from ${selectedLangLabel}. You must understand its meaning and use it as context to generate the required sections EXCLUSIVELY in ${selectedLangLabel}.)
 
 **Output Format (Strictly Adhere to this Structure AND the Language Requirement for generated parts):**
 
 ${videoTitle}
-[AI: Generate a compelling 1-2 sentence hook/introductory paragraph based on the Story Outline. This hook MUST be written EXCLUSIVELY in ${selectedLangLabel}. ${exampleLanguageDisclaimer} Example: "Khi quyền lực trở thành vũ khí tàn nhẫn, mẹ chồng sẵn sàng dồn con dâu vào đường cùng. Nhưng bà không ngờ, cô con dâu tưởng chừng yếu đuối ấy lại nắm giữ bí mật có thể lật ngược thế cờ, quyết định vận mệnh của cả gia tộc!"]
+<HOOK>
+<DESCRIPTION>
+<INVITE>
+<TIMELINE>
+<CALL_TO_ACTION>
+<HASHTAGS>
+<TAGS>
 
-[AI: Generate a sentence inviting users to listen and comment here. This sentence MUST be in ${selectedLangLabel}. For example, in Vietnamese: "Hãy Cùng Lắng Nghe Câu Chuyện Đầy Cảm Xúc Này và đừng quên để lại suy nghĩ của bạn bên dưới bình luận nhé."]
-
-TIMELINE: ${videoTitle}
-[AI: Generate EXACTLY ${timelineCount} timeline entries. Each entry MUST be on a new line.
-Format:
-- If video duration (${videoDuration} minutes) is >= 60 minutes, use HH:MM:SS - [Short, catchy description. This description MUST be EXCLUSIVELY in ${selectedLangLabel}]
-// ...existing code...
-- If video duration (${videoDuration} minutes) is < 60 minutes, use MM:SS - [Short, catchy description. This description MUST be EXCLUSIVELY in ${selectedLangLabel}]
-Distribute timestamps logically throughout the ${videoDuration}-minute video based on the Story Outline. Ensure the timestamps are sequential and make sense for the flow of a story. ${exampleLanguageDisclaimer} Example: 00:00 - Gia tộc quyền lực và nàng dâu bị coi thường]
-
-[AI: Generate a call-to-action sentence here, asking users to Like, Subscribe to channel "[TÊN KÊNH CỦA BẠN]", and Comment. IMPORTANT: The phrase "[TÊN KÊNH CỦA BẠN]" must be kept exactly as is, it's a placeholder. This sentence MUST be in ${selectedLangLabel}.]
-
-[AI: Generate 5 relevant hashtags. Each hashtag MUST be EXCLUSIVELY in ${selectedLangLabel}, each starting with # and on a new line. ${exampleLanguageDisclaimer} Example:
-#truyenaudio
-#phieuluu
-#tamlyxahoi
-#giadinh
-#baohanhgiadinh]
-
-[TAGS][AI: Generate a list of 15-20 in-depth tags (keywords) for the video. These tags MUST be EXCLUSIVELY in ${selectedLangLabel}, separated by commas. ${exampleLanguageDisclaimer} Example: tag1, tag2, tag3][/TAGS]
-
-**Important Final Check for AI:**
-- Before outputting, verify that ALL text you generated for the hook, timeline descriptions, hashtags, and tags is EXCLUSIVELY in ${selectedLangLabel}.
-- The section [TAGS]...[/TAGS] must be the absolute last part of your entire response, with the tags inside it. Do not add any text after the closing [/TAGS] tag.
+For each section above, generate the content as instructed previously, but DO NOT include any [AI: ...] tags, instructions, or placeholder text in your output. Only return the final, clean, SEO-optimized YouTube description, timeline, hashtags, and tags in ${selectedLangLabel}. The output must be ready to copy-paste to YouTube, with no extra instructions or formatting tags.
 `;
     
     try {
