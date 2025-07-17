@@ -14,7 +14,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateTextWithJsonOutput } from '../../services/aiProxyService';
+import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
 
 interface YoutubeSeoModuleProps {
   apiSettings: ApiSettings;
@@ -83,7 +83,7 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
 `;
     
     try {
-      const result = await generateText(prompt, undefined, apiSettings);
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
       let descriptionText = result.text;
       const tagMatch = descriptionText.match(/\[TAGS\]([\s\S]*?)\[\/TAGS\]/);
       let tagsResult = '';
@@ -115,7 +115,7 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
     Format the output clearly with headings for "Từ khóa Ngắn (Short Keywords):" and "Từ khóa Dài (Long-tail Keywords):". Each keyword on a new line.`;
 
     try {
-      const result = await generateText(prompt, undefined, apiSettings);
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ suggestedKeywordsOutput: result.text, currentResult: result.text, loadingMessage: "Tìm từ khóa hoàn tất!" });
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tìm từ khóa." }); 
@@ -141,7 +141,7 @@ Example: "00:00 - [Short, catchy description]". Distribute timestamps logically 
     Distribute the chapters logically throughout the video. Each chapter should be in the format 'HH:MM:SS - Chapter Title in ${selectedLangLabel}' or 'MM:SS - Chapter Title in ${selectedLangLabel}'. Ensure the final chapter does not exceed the total video duration. List each chapter on a new line. Only return the list of chapters.`;
     
     try {
-      const result = await generateText(prompt, undefined, apiSettings);
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
       updateState({ generatedChapters: result.text, currentResult: result.text, loadingMessage: "Tạo chapter hoàn tất!" });
     } catch (e) { 
         updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo chapter." }); 
