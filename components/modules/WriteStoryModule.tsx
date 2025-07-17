@@ -24,6 +24,18 @@ interface WriteStoryModuleProps {
 }
 
 const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis }) => {
+  const generateText = (
+    prompt: string,
+    systemInstruction?: string,
+    useJsonOutput?: boolean,
+    apiSettings?: ApiSettings
+  ) => {
+    if (apiSettings?.provider === 'deepseek') {
+      return generateDeepSeekText(prompt, systemInstruction, apiSettings);
+    }
+    return generateGeminiText(prompt, systemInstruction, useJsonOutput, apiSettings);
+  };
+  
   const {
     activeWriteTab,
     // Common settings
@@ -150,9 +162,10 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     \n---`;
 
     try {
-      const result = await generateGeminiText(prompt, undefined, undefined, apiSettings);
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
       if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-      updateState({ generatedHooks: result.text, hookLoadingMessage: "Tạo hook hoàn tất!" });
+      const text = typeof result === 'string' ? result : result.text;
+      updateState({ generatedHooks: text, hookLoadingMessage: "Tạo hook hoàn tất!" });
     } catch (e: any) {
       if (e.name === 'AbortError') {
         updateState({ hookError: 'Tạo hook đã bị hủy.', hookLoadingMessage: 'Đã hủy.' });
@@ -258,7 +271,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         \nBắt đầu viết phần tiếp theo (bằng ${outputLanguageLabel}):`;
 
         if (i > 0) await delay(1000, abortCtrl.signal); 
-        const result = await generateGeminiText(prompt, undefined, undefined, apiSettings);
+        const result = await generateText(prompt, undefined, undefined, apiSettings);
         if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         let currentChunkText = result.text;
         if (i === 0) {
@@ -374,11 +387,11 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     Không thêm bất kỳ lời bình, giới thiệu, hay tiêu đề nào.`;
 
     try {
-      const result = await generateGeminiText(prompt, undefined, undefined, apiSettings);
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
       if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-      const editedStory = result.text;
+      const text = typeof result === 'string' ? result : result.text;
       updateState({ 
-        generatedStory: editedStory, 
+        generatedStory: text, 
         storyLoadingMessage: '✅ ĐÃ BIÊN TẬP XONG 100%!', 
         singleStoryEditProgress: 100,
         hasSingleStoryBeenEditedSuccessfully: true
@@ -411,7 +424,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     const prompt = `Translate the following text to Vietnamese. Provide only the translated text, without any additional explanations or context.\n\nText to translate:\n"""\n${generatedStory.trim()}\n"""`;
 
     try {
-        const result = await generateGeminiText(prompt, undefined, false, apiSettings);
+        const result = await generateText(prompt, undefined, false, apiSettings);
         updateStoryTranslationState({ translatedText: result.text.trim() });
     } catch (e) {
         console.error("Story Translation Error:", e);
@@ -459,9 +472,10 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     \n- The lesson must be written in **${selectedOutputLangLabel}**. ${ctaLessonSegment}
     \n- Return only the lesson text. No introductions or other text.`;
     try {
-      const result = await generateGeminiText(prompt, undefined, undefined, apiSettings);
+      const result = await generateText(prompt, undefined, undefined, apiSettings);
       if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-      updateState({ generatedLesson: result.text, lessonLoadingMessage: "Đúc kết bài học hoàn tất!" });
+      const text = typeof result === 'string' ? result : result.text;
+      updateState({ generatedLesson: text, lessonLoadingMessage: "Đúc kết bài học hoàn tất!" });
     } catch (e: any) {
        if (e.name === 'AbortError') {
         updateState({ lessonError: 'Tạo bài học đã bị hủy.', lessonLoadingMessage: 'Đã hủy.' });

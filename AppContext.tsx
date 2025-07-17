@@ -13,6 +13,7 @@ interface AppContextType {
   apiSettings: ApiSettings;
   setApiSettings: React.Dispatch<React.SetStateAction<ApiSettings>>;
   getAvailableAIProviders: () => Promise<string[]>;
+  consumeCredit: (amount: number) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -110,6 +111,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
+  const consumeCredit = useCallback(async (amount: number): Promise<boolean> => {
+    if (!keyInfo || typeof keyInfo.credit !== 'number') return false;
+    if (keyInfo.credit < amount) return false;
+    updateCredit(keyInfo.credit - amount);
+    return true;
+  }, [keyInfo, updateCredit]);
+
   useEffect(() => {
     const savedKey = localStorage.getItem('user_key');
     if (savedKey) {
@@ -129,6 +137,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     apiSettings,
     setApiSettings,
     getAvailableAIProviders,
+    consumeCredit,
   };
 
   return (

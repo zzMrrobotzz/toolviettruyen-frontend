@@ -224,6 +224,11 @@ export interface WriteStoryModuleState {
   // batchStoryError: string | null;
   // batchStoryProgressMessage: string |null;
   // batchStoryLoading: boolean;
+  storyTranslation: {
+    translatedText: string | null;
+    isTranslating: boolean;
+    error: string | null;
+  };
 }
 
 // Rewrite Module - Batch functionality REMOVED
