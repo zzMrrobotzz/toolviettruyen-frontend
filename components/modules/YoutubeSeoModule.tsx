@@ -1,12 +1,6 @@
   // ...existing code...
 
-  const handleSuggestKeywords = async () => {
-    if (!keywordTopic.trim()) { updateState({ error: 'Vui lòng nhập Chủ đề chính của Video.' }); return; }
-
-    updateState({ error: null, currentResult: '', suggestedKeywordsOutput: '', loadingMessage: 'Đang tìm từ khóa liên quan...' });
-
-    const selectedLangLabel = getSelectedLanguageLabel();
-import React from 'react'; 
+import React from 'react';
 import { 
     ApiSettings, 
     YoutubeSeoModuleState, 
@@ -28,6 +22,33 @@ interface YoutubeSeoModuleProps {
 }
 
 const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
+  // Hàm xử lý gợi ý từ khóa liên quan cho tab 'Từ khóa'
+  const handleSuggestKeywords = async () => {
+    if (!keywordTopic.trim()) {
+      updateState({ error: 'Vui lòng nhập Chủ đề chính của Video.' });
+      return;
+    }
+
+    updateState({ error: null, currentResult: '', suggestedKeywordsOutput: '', loadingMessage: 'Đang tìm từ khóa liên quan...' });
+
+    const selectedLangLabel = getSelectedLanguageLabel();
+    const prompt = `Bạn là chuyên gia nghiên cứu từ khóa YouTube. Hãy liệt kê 10-20 từ khóa liên quan nhất cho chủ đề sau, tối ưu SEO, không lặp lại, chỉ trả về danh sách từ khóa, không thêm giải thích, không thêm tag, không thêm ký tự đặc biệt. Chủ đề: ${keywordTopic}. Ngôn ngữ: ${selectedLangLabel}.`;
+
+    try {
+      const resultText = await generateTextHelper(prompt);
+      updateState({ suggestedKeywordsOutput: resultText, currentResult: resultText, loadingMessage: 'Tìm từ khóa hoàn tất!' });
+    } catch (e) {
+      updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: 'Lỗi tìm từ khóa.' });
+    } finally {
+      setTimeout(() => {
+        setModuleState(prev =>
+          (prev.loadingMessage?.includes('hoàn tất') || prev.loadingMessage?.includes('Lỗi'))
+            ? { ...prev, loadingMessage: null }
+            : prev
+        );
+      }, 3000);
+    }
+  };
   const {
     activeSeoTab, videoTitle, youtubeOutline, language, timelineCount, videoDuration,
     videoKeywords, youtubeDescription, youtubeTags, keywordTopic, suggestedKeywordsOutput,
