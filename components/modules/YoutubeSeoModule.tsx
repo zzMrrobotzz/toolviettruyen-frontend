@@ -14,13 +14,26 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateTextWithJsonOutput } from '../../services/textGenerationService';
+import { generateText as generateGeminiText, generateTextWithJsonOutput as generateGeminiTextWithJsonOutput } from '../../services/geminiService';
+import { generateText as generateDeepSeekText } from '../../services/deepseekService';
 
 interface YoutubeSeoModuleProps {
   apiSettings: ApiSettings;
   moduleState: YoutubeSeoModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<YoutubeSeoModuleState>>;
 }
+
+const generateText = (prompt: string, ...args: any[]) => {
+  if (apiSettings.provider === 'deepseek') {
+    return generateDeepSeekText(prompt, ...args);
+  }
+  return generateGeminiText(prompt, ...args);
+};
+
+const generateTextWithJsonOutput = (prompt: string, ...args: any[]) => {
+  // Nếu deepseek không có hàm này thì chỉ dùng gemini
+  return generateGeminiTextWithJsonOutput(prompt, ...args);
+};
 
 const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
   // Destructure state và khai báo các hàm tiện ích
