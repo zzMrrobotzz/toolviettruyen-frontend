@@ -223,7 +223,9 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ moduleState, setMod
 
   // ... (Render logic remains the same)
   return (
-    // ... JSX
+    <div>
+      {/* ... JSX */}
+    </div>
   );
 };
 
