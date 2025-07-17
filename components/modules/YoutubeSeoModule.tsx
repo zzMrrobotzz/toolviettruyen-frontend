@@ -14,7 +14,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateTextWithJsonOutput } from '@/services/textGenerationService';
+import { generateText, generateTextWithJsonOutput } from '../../services/textGenerationService';
 
 interface YoutubeSeoModuleProps {
   apiSettings: ApiSettings;

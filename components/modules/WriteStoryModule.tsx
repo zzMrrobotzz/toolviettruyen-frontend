@@ -10,7 +10,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '@/services/textGenerationService';
+import { generateText } from '../../services/textGenerationService';
 import { delay } from '../../utils'; // Added delay import
 import { Languages } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
