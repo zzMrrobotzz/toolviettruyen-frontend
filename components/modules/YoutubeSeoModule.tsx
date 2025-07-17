@@ -105,16 +105,17 @@ ${youtubeOutline}
 ${videoTitle}
 [AI: Generate a compelling 1-2 sentence hook/introductory paragraph based on the Story Outline. This hook MUST be written EXCLUSIVELY in ${selectedLangLabel}. ${exampleLanguageDisclaimer} Example: "Khi quyền lực trở thành vũ khí tàn nhẫn, mẹ chồng sẵn sàng dồn con dâu vào đường cùng. Nhưng bà không ngờ, cô con dâu tưởng chừng yếu đuối ấy lại nắm giữ bí mật có thể lật ngược thế cờ, quyết định vận mệnh của cả gia tộc!"]
 
-Hãy Cùng Lắng Nghe Câu Chuyện Đầy Cảm Xúc Này và đừng quên để lại suy nghĩ của bạn bên dưới bình luận nhé.
+[AI: Generate a sentence inviting users to listen and comment here. This sentence MUST be in ${selectedLangLabel}. For example, in Vietnamese: "Hãy Cùng Lắng Nghe Câu Chuyện Đầy Cảm Xúc Này và đừng quên để lại suy nghĩ của bạn bên dưới bình luận nhé."]
 
 TIMELINE: ${videoTitle}
 [AI: Generate EXACTLY ${timelineCount} timeline entries. Each entry MUST be on a new line.
 Format:
 - If video duration (${videoDuration} minutes) is >= 60 minutes, use HH:MM:SS - [Short, catchy description. This description MUST be EXCLUSIVELY in ${selectedLangLabel}]
+// ...existing code...
 - If video duration (${videoDuration} minutes) is < 60 minutes, use MM:SS - [Short, catchy description. This description MUST be EXCLUSIVELY in ${selectedLangLabel}]
 Distribute timestamps logically throughout the ${videoDuration}-minute video based on the Story Outline. Ensure the timestamps are sequential and make sense for the flow of a story. ${exampleLanguageDisclaimer} Example: 00:00 - Gia tộc quyền lực và nàng dâu bị coi thường]
 
-Hãy nhấn Like video và Đăng ký kênh [TÊN KÊNH CỦA BẠN] để không bỏ lỡ những câu chuyện kịch tính và ý nghĩa tiếp theo! Đừng quên để lại Bình luận bên dưới chia sẻ cảm nhận của bạn nhé!
+[AI: Generate a call-to-action sentence here, asking users to Like, Subscribe to channel "[TÊN KÊNH CỦA BẠN]", and Comment. IMPORTANT: The phrase "[TÊN KÊNH CỦA BẠN]" must be kept exactly as is, it's a placeholder. This sentence MUST be in ${selectedLangLabel}.]
 
 [AI: Generate 5 relevant hashtags. Each hashtag MUST be EXCLUSIVELY in ${selectedLangLabel}, each starting with # and on a new line. ${exampleLanguageDisclaimer} Example:
 #truyenaudio
