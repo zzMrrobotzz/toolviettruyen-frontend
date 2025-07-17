@@ -1,3 +1,39 @@
+// Chuẩn hoá 2 hàm FE cho YoutubeSeoModule
+// Hàm generateText: trả về { text: string }
+export const generateText = async (
+  prompt: string,
+  systemInstruction?: string,
+  apiSettings?: any
+): Promise<{ text: string }> => {
+  const response = await fetch('/api/ai/generate-text', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
+    },
+    body: JSON.stringify({ prompt, systemInstruction, ...apiSettings }),
+  });
+  if (!response.ok) throw new Error('AI proxy error');
+  return await response.json();
+};
+
+// Hàm generateTextWithJsonOutput: trả về JSON object
+export const generateTextWithJsonOutput = async <T,>(
+  prompt: string,
+  systemInstruction?: string,
+  apiSettings?: any
+): Promise<T> => {
+  const response = await fetch('/api/ai/generate-text-json', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
+    },
+    body: JSON.stringify({ prompt, systemInstruction, ...apiSettings }),
+  });
+  if (!response.ok) throw new Error('AI proxy error');
+  return await response.json();
+};
 import { API_BASE_URL } from '../config';
 
 export interface AIRequest {
