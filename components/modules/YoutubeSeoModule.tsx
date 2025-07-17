@@ -1,3 +1,11 @@
+  // ...existing code...
+
+  const handleSuggestKeywords = async () => {
+    if (!keywordTopic.trim()) { updateState({ error: 'Vui lòng nhập Chủ đề chính của Video.' }); return; }
+
+    updateState({ error: null, currentResult: '', suggestedKeywordsOutput: '', loadingMessage: 'Đang tìm từ khóa liên quan...' });
+
+    const selectedLangLabel = getSelectedLanguageLabel();
 import React from 'react'; 
 import { 
     ApiSettings, 
@@ -81,71 +89,29 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, module
 
     updateState({ error: null, currentResult: '', youtubeDescription: '', youtubeTags: '', loadingMessage: 'Đang tạo mô tả & timeline theo cấu trúc mới...' });
 
-    const selectedLangLabel = getSelectedLanguageLabel(); // e.g., "Tiếng Hàn"
-
-    // Clarify that examples are for structure/content type, not for language.
-    const exampleLanguageDisclaimer = `(The following example is illustrative of content and structure only; your actual output for this section MUST be in ${selectedLangLabel}.)`;
-
-    const prompt = `
-You are a YouTube SEO expert and a creative writer. Your task is to generate a complete and optimized video description, including a timeline, strictly following the format provided below.
-**CRITICAL LANGUAGE REQUIREMENT: All AI-generated text (the hook, timeline descriptions, hashtags, and tags) MUST be exclusively in ${selectedLangLabel}. No other languages, including Vietnamese or English, are permitted in these generated sections, unless ${selectedLangLabel} itself is English or Vietnamese.**
-
-**Input Information:**
-- Video Title: ${videoTitle}
-- Main Keywords (for context and tags): ${videoKeywords || 'Không có'}
-- Video Duration: ${videoDuration} minutes
-- Story Outline/Main Content:
----
-${youtubeOutline}
----
-  (Note: The Story Outline/Main Content above may be in a language different from ${selectedLangLabel}. You must understand its meaning and use it as context to generate the required sections EXCLUSIVELY in ${selectedLangLabel}.)
-
-**Output Format (Strictly Adhere to this Structure AND the Language Requirement for generated parts):**
-
-${videoTitle}
-<HOOK>
-<DESCRIPTION>
-<INVITE>
-<TIMELINE>
-<CALL_TO_ACTION>
-<HASHTAGS>
-<TAGS>
-
-For each section above, generate the content as instructed previously, but DO NOT include any [AI: ...] tags, instructions, or placeholder text in your output. Only return the final, clean, SEO-optimized YouTube description, timeline, hashtags, and tags in ${selectedLangLabel}. The output must be ready to copy-paste to YouTube, with no extra instructions or formatting tags.
-`;
-    
-    try {
-      const resultText = await generateTextHelper(prompt, 'You are a YouTube SEO expert and creative writer.');
-      let descriptionText = resultText;
-      const tagMatch = descriptionText.match(/\[TAGS\]([\s\S]*?)\[\/TAGS\]/);
-      let tagsResult = '';
-      if (tagMatch && tagMatch[1]) {
-          tagsResult = tagMatch[1].trim();
-          descriptionText = descriptionText.replace(tagMatch[0], '').trim();
-      }
-      updateState({ youtubeDescription: descriptionText, youtubeTags: tagsResult, currentResult: descriptionText, loadingMessage: "Tạo mô tả & timeline theo cấu trúc mới hoàn tất!" });
-    } catch (e) { 
-        updateState({ error: `Đã xảy ra lỗi: ${(e as Error).message}`, loadingMessage: "Lỗi tạo mô tả (cấu trúc mới)." }); 
-    } finally { 
-        setTimeout(() => {
-            setModuleState(prev => 
-            (prev.loadingMessage?.includes("hoàn tất") || prev.loadingMessage?.includes("Lỗi")) 
-            ? {...prev, loadingMessage: null} 
-            : prev
-            )
-        }, 3000);
-    }
-  };
-
-  const handleSuggestKeywords = async () => {
-    if (!keywordTopic.trim()) { updateState({ error: 'Vui lòng nhập Chủ đề chính của Video.' }); return; }
-
-    updateState({ error: null, currentResult: '', suggestedKeywordsOutput: '', loadingMessage: 'Đang tìm từ khóa liên quan...' });
 
     const selectedLangLabel = getSelectedLanguageLabel();
-    const prompt = `You are a YouTube SEO keyword research expert. Based on the video topic: "${keywordTopic}", please suggest a comprehensive list of 15-20 relevant SEO keywords and 5-7 long-tail keywords. 
-    Provide the keywords in ${selectedLangLabel}. 
-    Format the output clearly with headings for "Từ khóa Ngắn (Short Keywords):" and "Từ khóa Dài (Long-tail Keywords):". Each keyword on a new line.`;
+    const prompt = `
+Bạn là chuyên gia SEO YouTube và copywriter sáng tạo. Hãy tạo một mô tả video hoàn chỉnh, tối ưu SEO, bao gồm cả timeline, hashtag, tag... Dựa trên thông tin sau:
+- Tiêu đề video: ${videoTitle}
+- Từ khóa chính: ${videoKeywords || 'Không có'}
+- Thời lượng video: ${videoDuration} phút
+- Dàn ý/Nội dung chính:
+${youtubeOutline}
+
+YÊU CẦU QUAN TRỌNG:
+- Toàn bộ nội dung AI sinh ra (mô tả, timeline, hashtag, tag, lời mời...) PHẢI hoàn toàn bằng ${selectedLangLabel}.
+- KHÔNG được sử dụng bất kỳ ngôn ngữ nào khác ngoài ${selectedLangLabel}.
+- KHÔNG được chèn bất kỳ tag, tiêu đề, nhãn, ký tự đặc biệt nào như <HOOK>, <DESCRIPTION>, <INVITE>, <TIMELINE>, <CALL_TO_ACTION>, <HASHTAGS>, <TAGS>... vào kết quả.
+- KHÔNG được thêm hướng dẫn, chú thích, hoặc bất kỳ dòng giải thích nào.
+- Chỉ trả về văn bản hoàn chỉnh, sạch, đúng chuẩn SEO, sẵn sàng để copy lên YouTube.
+- Các phần nên cách nhau bằng 1 dòng trống.
+
+Hãy bắt đầu bằng đoạn hook hấp dẫn, sau đó là mô tả chi tiết, lời mời xem video, timeline, call-to-action, hashtag và tag phù hợp. Tất cả đều phải tự nhiên, đúng ngữ pháp, không lặp lại tiêu đề hoặc dàn ý.
+`;
+
+
+
 
     try {
       const resultText = await generateTextHelper(prompt);
