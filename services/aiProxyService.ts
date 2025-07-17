@@ -15,7 +15,10 @@ export interface AIResponse {
   remainingCredits?: number;
 }
 
-export const generateTextViaBackend = async (request: AIRequest): Promise<AIResponse> => {
+export const generateTextViaBackend = async (
+  request: AIRequest,
+  updateCreditFunction: (newCredit: number) => void
+): Promise<AIResponse> => {
   try {
     const response = await fetch(`${API_BASE_URL}/ai/generate`, {
       method: 'POST',
@@ -26,12 +29,16 @@ export const generateTextViaBackend = async (request: AIRequest): Promise<AIResp
       body: JSON.stringify(request),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'AI generation failed');
+      throw new Error(data.error || 'AI generation failed');
     }
 
-    const data = await response.json();
+    if (data.success && typeof data.remainingCredits === 'number') {
+      updateCreditFunction(data.remainingCredits);
+    }
+
     return data;
   } catch (error) {
     console.error('Error calling AI via backend:', error);

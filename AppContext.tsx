@@ -8,11 +8,10 @@ interface AppContextType {
   isLoading: boolean;
   error: string | null;
   validateKey: (key: string) => Promise<boolean>;
-  consumeCredit: (cost?: number) => Promise<boolean>;
+  updateCredit: (newCredit: number) => void; // <--- THAY ĐỔI Ở ĐÂY
   logout: () => void;
   apiSettings: ApiSettings;
   setApiSettings: React.Dispatch<React.SetStateAction<ApiSettings>>;
-  // Thêm method để lấy AI provider từ backend
   getAvailableAIProviders: () => Promise<string[]>;
 }
 
@@ -63,7 +62,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } else {
         setKeyInfo(null);
         localStorage.removeItem('user_key');
-        setError('Key không hợp lệ hoặc đã hết hạn.');
+        setError(data.message || 'Key không hợp lệ hoặc đã hết hạn.');
         return false;
       }
     } catch (err) {
@@ -76,39 +75,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
-  const consumeCredit = useCallback(async (cost: number = 1): Promise<boolean> => {
-    const keyToUse = keyInfo?.key || localStorage.getItem('user_key');
-    console.log('Gọi use-credit với:', { key: keyToUse, amount: cost });
-    if (!keyToUse || !keyInfo || keyInfo.credit < cost) {
-      setError('Bạn không đủ credit để thực hiện hành động này.');
-      return false;
+  // Hàm mới để cập nhật credit một cách an toàn
+  const updateCredit = useCallback((newCredit: number) => {
+    if (typeof newCredit === 'number' && !isNaN(newCredit)) {
+      setKeyInfo(prev => prev ? { ...prev, credit: newCredit } : null);
     }
-    try {
-      const optimisticKeyInfo = { ...keyInfo, credit: keyInfo.credit - cost };
-      setKeyInfo(optimisticKeyInfo);
-
-      const response = await fetch(`${API_BASE_URL}/keys/use-credit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: keyToUse, amount: cost }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setKeyInfo(prev => prev ? { ...prev, credit: data.credit } : null);
-        return true;
-      } else {
-        setKeyInfo(keyInfo); 
-        setError(data.message || 'Có lỗi xảy ra khi trừ credit.');
-        return false;
-      }
-    } catch (err) {
-      setKeyInfo(keyInfo);
-      setError('Lỗi mạng khi đang cố gắng trừ credit.');
-      return false;
-    }
-  }, [keyInfo]);
+  }, []);
 
   const logout = useCallback(() => {
     setKeyInfo(null);
@@ -130,7 +102,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       
       const data = await response.json();
-      return data.providers || [];
+      // Assuming the backend returns an array of provider objects
+      return data.map((provider: any) => provider.name) || [];
     } catch (error) {
       console.error('Error fetching AI providers:', error);
       return ['gemini']; // Fallback to default
@@ -151,7 +124,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     isLoading,
     error,
     validateKey,
-    consumeCredit,
+    updateCredit, // <--- THAY ĐỔI Ở ĐÂY
     logout,
     apiSettings,
     setApiSettings,

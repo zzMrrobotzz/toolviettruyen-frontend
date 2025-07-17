@@ -18,7 +18,7 @@ interface SuperAgentModuleProps {
 const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
   moduleState, setModuleState
 }) => {
-  const { consumeCredit } = useAppContext();
+  const { updateCredit } = useAppContext(); // Lấy hàm updateCredit mới
   const {
     sourceText, wordCount, imageCount, aspectRatio,
     generatedStory, generatedImages, error
@@ -45,13 +45,13 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
       return;
     }
     
-    // Estimate total cost: 1 for story + 2 per image 
-    const totalCost = 1 + (imageCount * 2);
-    const hasCredits = await consumeCredit(totalCost);
-    if (!hasCredits) {
-      updateState({ error: `Không đủ credit! Cần ${totalCost} credit (1 truyện + ${imageCount}x2 ảnh).` });
-      return;
-    }
+    // XÓA BỎ LOGIC CŨ
+    // const totalCost = 1 + (imageCount * 2);
+    // const hasCredits = await consumeCredit(totalCost);
+    // if (!hasCredits) {
+    //   updateState({ error: `Không đủ credit! Cần ${totalCost} credit (1 truyện + ${imageCount}x2 ảnh).` });
+    //   return;
+    // }
 
     const abortController = new AbortController();
     setCurrentAbortController(abortController);
@@ -72,11 +72,13 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
         storyPrompt = `Từ tiêu đề sau: "${sourceText}", hãy viết một câu chuyện hoàn chỉnh khoảng ${wordCount} từ.`;
       }
       
-      const storyResult = await generateTextViaBackend({
-        prompt: storyPrompt,
-        provider: 'gemini',
-        systemInstruction: 'Bạn là một nhà văn chuyên nghiệp viết truyện hay và hấp dẫn.',
-      });
+      const storyResult = await generateTextViaBackend(
+        {
+          prompt: storyPrompt,
+          provider: 'gemini',
+        },
+        updateCredit // Truyền hàm updateCredit vào
+      );
       
       if (!storyResult.success || !storyResult.text) {
         throw new Error(storyResult.error || 'Failed to generate story');
@@ -84,7 +86,7 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
       if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       updateState({ generatedStory: storyResult.text });
       
-      // Step 2: Generate Images
+      // Step 2: Generate Images (Logic này cần được xem xét lại vì nó không trừ credit)
       if (imageCount > 0) {
         setLoadingMessage(`Bước 2/2: Đang tạo ${imageCount} ảnh minh họa...`);
         await delay(1000);
@@ -96,6 +98,8 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
           setLoadingMessage(`Bước 2/2: Đang tạo ảnh ${i + 1}/${imageCount}...`);
           
           const imagePrompt = `Minh họa cho câu chuyện: ${storyResult.text.substring(0, 300)}...`;
+          
+          // Tạm thời chưa xử lý credit cho ảnh, sẽ cần một API riêng
           const imageResult = await generateImageViaBackend(imagePrompt, aspectRatio, 'gemini');
           
           if (imageResult.success && imageResult.imageData) {

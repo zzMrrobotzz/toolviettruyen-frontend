@@ -86,7 +86,7 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, module
     // Clarify that examples are for structure/content type, not for language.
     const exampleLanguageDisclaimer = `(The following example is illustrative of content and structure only; your actual output for this section MUST be in ${selectedLangLabel}.)`;
 
--    const prompt = `
+    const prompt = `
 You are a YouTube SEO expert and a creative writer. Your task is to generate a complete and optimized video description, including a timeline, strictly following the format provided below.
 **CRITICAL LANGUAGE REQUIREMENT: All AI-generated text (the hook, timeline descriptions, hashtags, and tags) MUST be exclusively in ${selectedLangLabel}. No other languages, including Vietnamese or English, are permitted in these generated sections, unless ${selectedLangLabel} itself is English or Vietnamese.**
 
