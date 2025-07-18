@@ -1,14 +1,14 @@
 
 
 import React, { useEffect } from 'react';
-import { 
-    ApiSettings, 
+import {
+    ApiSettings,
     RewriteModuleState,
     RewriteActiveTab,
     RewriteGoal,
     QuickRewriteState,
     RestructureRewriteState
-} from '../../types'; 
+} from '../../types';
 import { HOOK_LANGUAGE_OPTIONS, REWRITE_STYLE_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
@@ -41,8 +41,8 @@ const TabButton: React.FC<{
         onClick={() => onClick(tabId)}
         disabled={disabled}
         className={`flex items-center space-x-2 px-4 py-3 font-medium rounded-t-lg text-base transition-colors
-            ${activeTab === tabId 
-                ? 'bg-indigo-600 text-white shadow-md' 
+            ${activeTab === tabId
+                ? 'bg-indigo-600 text-white shadow-md'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }
             disabled:opacity-50 disabled:cursor-not-allowed
@@ -62,7 +62,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
     const updateRestructureState = (updates: Partial<RestructureRewriteState>) => {
         setModuleState(prev => ({ ...prev, restructure: { ...prev.restructure, ...updates } }));
     };
-    
+
     const handleTabChange = (tabId: RewriteActiveTab) => {
         setModuleState(prev => ({
             ...prev,
@@ -94,7 +94,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
                     disabled={anyLoading}
                 />
             </div>
-            
+
             {moduleState.activeTab === 'restructure' && (
                 <RestructureTab
                     apiSettings={apiSettings}
@@ -126,10 +126,10 @@ interface RestructureTabProps {
 
 const RestructureTab: React.FC<RestructureTabProps> = ({ apiSettings, state, updateState }) => {
     const { keyInfo, setKeyInfo, consumeCredit } = useAppContext();
-    const { 
-        step, originalText, goal, perspectiveCharacter, targetGenre, customTargetGenre, 
-        targetStyle, customTargetStyle, rewritePlan, rewrittenText, 
-        isLoading, loadingMessage, error 
+    const {
+        step, originalText, goal, perspectiveCharacter, targetGenre, customTargetGenre,
+        targetStyle, customTargetStyle, rewritePlan, rewrittenText,
+        isLoading, loadingMessage, error
     } = state;
 
     useEffect(() => {
@@ -155,7 +155,7 @@ const RestructureTab: React.FC<RestructureTabProps> = ({ apiSettings, state, upd
         }
 
         updateState({ isLoading: true, error: null, loadingMessage: 'Đang tạo kế hoạch tái cấu trúc...' });
-        
+
         let goalDescription = `Mục tiêu là ${goal}`;
         let specificInstructions = '';
         switch(goal) {
@@ -199,28 +199,9 @@ const RestructureTab: React.FC<RestructureTabProps> = ({ apiSettings, state, upd
                  break;
         }
 
-        const prompt = `Bạn là một chuyên gia biên tập và lập kế hoạch truyện. Người dùng muốn tái cấu trúc một văn bản với mục tiêu cụ thể. Nhiệm vụ của bạn là tạo ra một kế hoạch rõ ràng, từng bước mà bạn sẽ tuân theo để đạt được mục tiêu này. Kế hoạch phải ngắn gọn, bằng Tiếng Việt, dễ hiểu để người dùng phê duyệt.
+        const prompt = `Bạn là một chuyên gia biên tập và lập kế hoạch truyện. Người dùng muốn tái cấu trúc một văn bản với mục tiêu cụ thể. Nhiệm vụ của bạn là tạo ra một kế hoạch rõ ràng, từng bước mà bạn sẽ tuân theo để đạt được mục tiêu này. Kế hoạch phải ngắn gọn, bằng Tiếng Việt, dễ hiểu để người dùng phê duyệt.\n\n**Văn bản gốc:**\n---\n${originalText}\n---\n\n**Mục tiêu của người dùng:** ${goalDescription}\n\n**Hướng dẫn cụ thể cho mục tiêu:**\n${specificInstructions}\n\n**Nhiệm vụ của bạn:**\nTạo một kế hoạch viết lại bằng Tiếng Việt. Kế hoạch phải nêu rõ những thay đổi chính bạn sẽ thực hiện.\nVí dụ, nếu mục tiêu là thay đổi góc nhìn, kế hoạch có thể là:\n1. Phân tích các sự kiện chính từ góc nhìn của nhân vật gốc.\n2. Xác định các sự kiện mà nhân vật '${perspectiveCharacter}' có thể chứng kiến hoặc biết đến.\n3. Viết lại câu chuyện từ góc nhìn của '${perspectiveCharacter}', tập trung vào suy nghĩ và cảm xúc của họ.\n4. Điều chỉnh văn phong để phù hợp với tính cách của '${perspectiveCharacter}'.\n\nChỉ trả về kế hoạch được đánh số. Không thêm bất kỳ văn bản nào khác.`
+;
 
-**Văn bản gốc:**
----
-${originalText}
----
-
-**Mục tiêu của người dùng:** ${goalDescription}
-
-**Hướng dẫn cụ thể cho mục tiêu:**
-${specificInstructions}
-
-**Nhiệm vụ của bạn:**
-Tạo một kế hoạch viết lại bằng Tiếng Việt. Kế hoạch phải nêu rõ những thay đổi chính bạn sẽ thực hiện.
-Ví dụ, nếu mục tiêu là thay đổi góc nhìn, kế hoạch có thể là:
-1. Phân tích các sự kiện chính từ góc nhìn của nhân vật gốc.
-2. Xác định các sự kiện mà nhân vật '${perspectiveCharacter}' có thể chứng kiến hoặc biết đến.
-3. Viết lại câu chuyện từ góc nhìn của '${perspectiveCharacter}', tập trung vào suy nghĩ và cảm xúc của họ.
-4. Điều chỉnh văn phong để phù hợp với tính cách của '${perspectiveCharacter}'.
-
-Chỉ trả về kế hoạch được đánh số. Không thêm bất kỳ văn bản nào khác.`;
-        
         try {
             const planResult = await generateAiContent(prompt, apiSettings?.provider || 'gemini', keyInfo.key);
             if (planResult.remainingCredits !== undefined) {
@@ -231,7 +212,7 @@ Chỉ trả về kế hoạch được đánh số. Không thêm bất kỳ văn
             updateState({ error: `Lỗi khi tạo kế hoạch: ${(e as Error).message}`, isLoading: false, loadingMessage: null });
         }
     };
-    
+
     const handleExecutePlan = async () => {
         const hasCredits = await consumeCredit(1);
         if (!hasCredits) {
@@ -239,23 +220,9 @@ Chỉ trả về kế hoạch được đánh số. Không thêm bất kỳ văn
             return;
         }
         updateState({ isLoading: true, error: null, loadingMessage: 'Đang thực thi kế hoạch và viết lại...' });
-        
-        const prompt = `Bạn là một nhà văn chuyên nghiệp. Bạn đã tạo ra một kế hoạch viết lại và người dùng đã phê duyệt nó. Bây giờ, bạn phải thực hiện kế hoạch đó một cách hoàn hảo.
 
-**Văn bản gốc:**
----
-${originalText}
----
-
-**Kế hoạch viết lại đã được phê duyệt:**
----
-${rewritePlan}
----
-
-**Nhiệm vụ của bạn:**
-Viết lại "Văn bản gốc" bằng cách tuân thủ chính xác "Kế hoạch viết lại đã được phê duyệt".
-Đầu ra cuối cùng phải là câu chuyện hoàn chỉnh, đã được viết lại, bằng Tiếng Việt.
-Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch, văn bản gốc, hoặc bất kỳ giải thích nào khác.`;
+        const prompt = `Bạn là một nhà văn chuyên nghiệp. Bạn đã tạo ra một kế hoạch viết lại và người dùng đã phê duyệt nó. Bây giờ, bạn phải thực hiện kế hoạch đó một cách hoàn hảo.\n\n**Văn bản gốc:**\n---\n${originalText}\n---\n\n**Kế hoạch viết lại đã được phê duyệt:**\n---\n${rewritePlan}\n---\n\n**Nhiệm vụ của bạn:**\nViết lại "Văn bản gốc" bằng cách tuân thủ chính xác "Kế hoạch viết lại đã được phê duyệt".\nĐầu ra cuối cùng phải là câu chuyện hoàn chỉnh, đã được viết lại, bằng Tiếng Việt.\nChỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch, văn bản gốc, hoặc bất kỳ giải thích nào khác.`
+;
 
         try {
             const executionResult = await generateAiContent(prompt, apiSettings?.provider || 'gemini', keyInfo.key);
@@ -279,7 +246,7 @@ Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch,
             loadingMessage: null
         });
     };
-    
+
     // UI for Planning Step
     const renderPlanningStep = () => (
         <div className="space-y-6">
@@ -288,17 +255,17 @@ Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch,
             </InfoBox>
             <div>
                 <label htmlFor="restructureOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
-                <textarea 
-                    id="restructureOriginalText" 
-                    value={originalText} 
-                    onChange={e => updateState({ originalText: e.target.value })} 
-                    rows={10} 
+                <textarea
+                    id="restructureOriginalText"
+                    value={originalText}
+                    onChange={e => updateState({ originalText: e.target.value })}
+                    rows={10}
                     className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
                     placeholder="Dán văn bản cần tái cấu trúc vào đây..."
                     disabled={isLoading}
                 />
             </div>
-            
+
              <div>
                 <label htmlFor="rewriteGoal" className="block text-sm font-medium text-gray-700 mb-1">Mục tiêu Tái cấu trúc:</label>
                 <select id="rewriteGoal" value={goal} onChange={e => updateState({ goal: e.target.value as RewriteGoal })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" disabled={isLoading}>
@@ -309,7 +276,7 @@ Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch,
                     <option value="changeGenre">Chuyển Thể loại</option>
                 </select>
             </div>
-            
+
             {/* Conditional Inputs */}
             {goal === 'changePerspective' && (
                 <div>
@@ -364,7 +331,7 @@ Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch,
             </div>
         </div>
     );
-    
+
     // UI for Completed Step
     const renderCompletedStep = () => (
          <div className="space-y-6">
@@ -414,7 +381,7 @@ interface QuickRewriteTabProps {
 
 const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, updateState }) => {
     const { keyInfo, setKeyInfo, consumeCredit } = useAppContext();
-    
+
     const {
         rewriteLevel, sourceLanguage, targetLanguage, rewriteStyle, customRewriteStyle, adaptContext,
         originalText, rewrittenText, error, progress, loadingMessage,
@@ -437,6 +404,15 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        if (targetLanguage !== sourceLanguage) {
+            updateState({ adaptContext: true });
+        } else {
+            updateState({ adaptContext: false });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [targetLanguage, sourceLanguage]);
+
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
             updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
@@ -448,7 +424,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
             return;
         }
         updateState({ error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false });
-        
+
         const CHUNK_CHAR_COUNT = 4000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
         let fullRewrittenText = '';
@@ -457,9 +433,9 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
             for (let i = 0; i < numChunks; i++) {
                 updateState({ progress: Math.round(((i + 1) / numChunks) * 100), loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` });
                 const textChunk = originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
-                
+
                 let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
-                
+
                 const levelDescriptions: {[key: number]: string} = {
                     0: 'only fix spelling and grammar. Keep the original story 100%.',
                     25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning and plot.',
@@ -485,8 +461,9 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
                     rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${effectiveStyle}.`;
                 }
 
-                const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.\n\n**Instructions:**\n- **Source Language:** ${selectedSourceLangLabel}\n- **Target Language:** ${selectedTargetLangLabel}\n- **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.\n- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}\n- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.\n- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.\n${localizationRequest}\n\n**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**\n---\n${fullRewrittenText || "This is the first chunk."}\n---\n\n**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**\n---\n${textChunk}\n---\n\n**Your Task:**\nProvide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.\n`;
-                
+                const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.\n\n**Instructions:**\n- **Source Language:** ${selectedSourceLangLabel}\n- **Target Language:** ${selectedTargetLangLabel}\n- **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.\n- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}\n- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.\n- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.\n${localizationRequest}\n\n**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**\n---\n${fullRewrittenText || "This is the first chunk."}\n---\n\n**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**\n---\n${textChunk}\n---\n\n**Your Task:**\nProvide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.\n`
+;
+
                 await delay(500); // Simulate API call delay
                 const result = await generateAiContent(prompt, apiSettings?.provider || 'gemini', keyInfo.key);
                 if (result.remainingCredits !== undefined) {
@@ -514,9 +491,10 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
             return;
         }
         updateState({ isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false });
-        
-        const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.\n\n**Text to Edit:**\n---\n${rewrittenText}\n---\n\n**Editing Instructions:**\n1.  **Consistency:** Ensure character names, locations, and plot points are consistent throughout the text. Correct any contradictions.\n2.  **Flow and Cohesion:** Improve the flow between sentences and paragraphs. Ensure smooth transitions.\n3.  **Clarity and Conciseness:** Remove repetitive phrases and redundant words. Clarify any confusing sentences.\n4.  **Grammar and Spelling:** Correct any grammatical errors or typos.\n5.  **Timestamp Check (Final):** Double-check and ensure absolutely NO timestamps (e.g., (11:42)) remain in the final text. The output must be a clean narrative.\n\n**Output:**\nReturn ONLY the fully edited and polished text. Do not add any commentary or explanations.\n`;
-        
+
+        const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.\n\n**Text to Edit:**\n---\n${rewrittenText}\n---\n\n**Editing Instructions:**\n1.  **Consistency:** Ensure character names, locations, and plot points are consistent throughout the text. Correct any contradictions.\n2.  **Flow and Cohesion:** Improve the flow between sentences and paragraphs. Ensure smooth transitions.\n3.  **Clarity and Conciseness:** Remove repetitive phrases and redundant words. Clarify any confusing sentences.\n4.  **Grammar and Spelling:** Correct any grammatical errors or typos.\n5.  **Timestamp Check (Final):** Double-check and ensure absolutely NO timestamps (e.g., (11:42)) remain in the final text. The output must be a clean narrative.\n\n**Output:**\nReturn ONLY the fully edited and polished text. Do not add any commentary or explanations.\n`
+;
+
         try {
             const result = await generateAiContent(editPrompt, apiSettings?.provider || 'gemini', keyInfo.key);
             if (result.remainingCredits !== undefined) {
@@ -529,13 +507,13 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
              setTimeout(() => updateState({ editLoadingMessage: null }), 3000);
         }
     };
-    
+
     const copyToClipboard = (text: string) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
         alert("Đã sao chép!");
     };
-    
+
     const anyLoading = loadingMessage !== null || isEditing;
     const userLevelDescriptions: { [key: number]: string } = {
         0: "Chỉ sửa lỗi chính tả và ngữ pháp cơ bản. Giữ nguyên 100% nội dung và văn phong gốc.",
@@ -551,7 +529,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
             <InfoBox>
                 <strong>Viết Lại Nhanh.</strong> Sử dụng thanh trượt để điều chỉnh mức độ thay đổi từ chỉnh sửa nhẹ đến sáng tạo hoàn toàn. Lý tưởng cho các tác vụ viết lại nhanh chóng.
             </InfoBox>
-            
+
             <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
                 <h3 className="text-xl font-semibold text-gray-800">Cài đặt Viết lại Nhanh</h3>
                  <div>
