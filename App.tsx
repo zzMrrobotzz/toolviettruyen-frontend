@@ -575,11 +575,15 @@ const App: React.FC = () => {
     switch (activeModule) {
             case ActiveModule.SuperAgent:
         return <SuperAgentModule 
+                  apiSettings={apiSettings}
+                  elevenLabsApiKeys={elevenLabsApiKeys}
+                  setElevenLabsApiKeys={setElevenLabsApiKeys}
                   moduleState={superAgentState}
                   setModuleState={setSuperAgentState}
                 />;
       case ActiveModule.CreativeLab:
         return <CreativeLabModule 
+                  apiSettings={apiSettings}
                   setActiveModule={setActiveModule}
                   setStoryOutlineForWriteModule={setStoryOutlineForWriteModule} 
                   setOutlineForSuperAgent={setOutlineForSuperAgent}
@@ -588,74 +592,89 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.WriteStory:
         return <WriteStoryModule 
+                  apiSettings={apiSettings}
                   moduleState={writeStoryState}
                   setModuleState={setWriteStoryState}
                   retrievedViralOutlineFromAnalysis={analysisState.viralOutlineAnalysisResult}
                 />;
       case ActiveModule.BatchStoryWriting:
         return <BatchStoryWritingModule 
+                  apiSettings={apiSettings}
                   moduleState={batchStoryWritingState}
                   setModuleState={setBatchStoryWritingState}
                 />;
       case ActiveModule.Rewrite:
         return <RewriteModule 
+                  apiSettings={apiSettings}
                   moduleState={rewriteState}
                   setModuleState={setRewriteState}
                 />;
       case ActiveModule.BatchRewrite:
         return <BatchRewriteModule 
+                  apiSettings={apiSettings}
                   moduleState={batchRewriteState}
                   setModuleState={setBatchRewriteState}
                 />;
       case ActiveModule.Analysis:
         return <AnalysisModule 
+                  apiSettings={apiSettings}
                   moduleState={analysisState}
                   setModuleState={setAnalysisState}
                 />;
        case ActiveModule.NicheThemeExplorer:
         return <NicheThemeExplorerModule 
+                  apiSettings={apiSettings}
                   moduleState={nicheThemeExplorerState}
                   setModuleState={setNicheThemeExplorerState}
                 />;
        case ActiveModule.Dream100CompetitorAnalysis:
         return <Dream100CompetitorAnalysisModule
+                  apiSettings={apiSettings}
                   moduleState={dream100State}
                   setModuleState={setDream100State}
                 />;
       case ActiveModule.TTS:
         return <TtsModule 
+                  apiSettings={apiSettings}
+                  elevenLabsApiKeys={elevenLabsApiKeys}
+                  setElevenLabsApiKeys={setElevenLabsApiKeys}
                   moduleState={ttsState}
                   setModuleState={setTtsState}
                 />;
       case ActiveModule.YouTubeSEO:
         return <YoutubeSeoModule 
+                  apiSettings={apiSettings}
                   moduleState={youtubeSeoState}
                   setModuleState={setYoutubeSeoState}
                 />;
       case ActiveModule.ViralTitleGenerator:
         return <ViralTitleGeneratorModule 
+                  apiSettings={apiSettings}
                   moduleState={viralTitleGeneratorState}
                   setModuleState={setViralTitleGeneratorState}
                  />;
       case ActiveModule.ImageGenerationSuite: 
         return <ImageGenerationSuiteModule 
+                  apiSettings={apiSettings}
                   moduleState={imageGenerationSuiteState}
                   setModuleState={setImageGenerationSuiteState}
                 />;
       case ActiveModule.CharacterStudio:
         return <CharacterStudioModule
+                  apiSettings={apiSettings}
                   moduleState={characterStudioState}
                   setModuleState={setCharacterStudioState}
                 />;
       case ActiveModule.EditStory:
         return <EditStoryModule
+                  apiSettings={apiSettings}
                   moduleState={editStoryState}
                   setModuleState={setEditStoryState}
                 />;
       case ActiveModule.Support: 
-        return <SupportModule currentKey={keyInfo.key} />;
+        return <SupportModule currentKey={keyInfo?.key || ''} />;
       case ActiveModule.Recharge:
-        return <RechargeModule currentKey={keyInfo.key} />;
+        return <RechargeModule currentKey={keyInfo?.key || ''} />;
       default:
         return <div className="p-6 text-center text-gray-600">Chọn một module từ thanh bên ��ể bắt đầu.</div>;
     }
