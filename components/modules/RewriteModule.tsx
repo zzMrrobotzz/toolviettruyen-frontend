@@ -511,24 +511,44 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
     }, [targetLanguage, sourceLanguage, updateState]);
 
     const handleSingleRewrite = async () => {
-         if (!originalText.trim()) {
+        console.log('handleSingleRewrite called');
+        
+        if (!originalText.trim()) {
             updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
             return;
         }
+        
+        console.log('Checking credits...');
         const hasCredits = await consumeCredit(1);
         if (!hasCredits) {
             updateState({ error: 'Không đủ credit để thực hiện thao tác này.' });
             return;
         }
-        updateState({ error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false });
+        
+        console.log('Starting rewrite process...');
+        updateState({ 
+            error: null, 
+            rewrittenText: '', 
+            progress: 0, 
+            loadingMessage: 'Đang chuẩn bị...', 
+            hasBeenEdited: false 
+        });
         
         const CHUNK_CHAR_COUNT = 4000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
         let fullRewrittenText = '';
 
         try {
+            console.log(`Processing ${numChunks} chunks...`);
+            
             for (let i = 0; i < numChunks; i++) {
-                updateState({ progress: Math.round(((i + 1) / numChunks) * 100), loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` });
+                console.log(`Processing chunk ${i + 1}/${numChunks}`);
+                
+                updateState({ 
+                    progress: Math.round(((i + 1) / numChunks) * 100), 
+                    loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` 
+                });
+                
                 const textChunk = originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
                 
                 let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
@@ -583,14 +603,28 @@ ${textChunk}
 Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
 `;
                 
+                console.log('Calling generateText...');
                 await delay(500); // Simulate API call delay
                 const result = await generateText(prompt, undefined, false, apiSettings);
+                console.log('generateText result:', result);
+                
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + result.text.trim();
                 updateState({ rewrittenText: fullRewrittenText }); // Update UI progressively
             }
-            updateState({ rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 });
+            
+            console.log('Rewrite completed');
+            updateState({ 
+                rewrittenText: fullRewrittenText.trim(), 
+                loadingMessage: 'Hoàn thành!', 
+                progress: 100 
+            });
         } catch (e) {
-            updateState({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
+            console.error('Rewrite error:', e);
+            updateState({ 
+                error: `Lỗi viết lại: ${(e as Error).message}`, 
+                loadingMessage: 'Lỗi!', 
+                progress: 0 
+            });
         } finally {
             setTimeout(() => updateState({ loadingMessage: null }), 3000);
         }
