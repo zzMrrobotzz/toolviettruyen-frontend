@@ -63,6 +63,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
 
     // Reset toàn bộ trạng thái liên quan khi mount (trừ originalText)
     useEffect(() => {
+        console.log('QuickRewriteTab mount - resetting loading states');
         updateState({
             loadingMessage: null,
             progress: 0,
@@ -249,6 +250,16 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
     };
     
     const anyLoading = loadingMessage !== null || isEditing;
+    
+    // Debug: Log current state
+    console.log('QuickRewriteTab render - current state:', {
+        loadingMessage,
+        isEditing,
+        editLoadingMessage,
+        anyLoading,
+        error,
+        editError
+    });
     const userLevelDescriptions: { [key: number]: string } = {
         0: "Chỉ sửa lỗi chính tả và ngữ pháp cơ bản. Giữ nguyên 100% nội dung và văn phong gốc.",
         25: "Làm mới văn bản bằng cách thay đổi một số từ ngữ và cấu trúc câu. Giữ nguyên ý nghĩa, nhân vật, bối cảnh và cốt truyện chính.",
