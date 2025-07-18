@@ -465,6 +465,21 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetLanguage, sourceLanguage]);
 
+    // Reset loading states when component mounts to prevent stuck loading state
+    useEffect(() => {
+        if (loadingMessage !== null || isEditing) {
+            updateState({ 
+                loadingMessage: null, 
+                isEditing: false, 
+                editLoadingMessage: null,
+                progress: 0,
+                error: null,
+                editError: null
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
             updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
