@@ -1,39 +1,3 @@
-// Chuẩn hoá 2 hàm FE cho YoutubeSeoModule
-// Hàm generateText: trả về { text: string }
-export const generateText = async (
-  prompt: string,
-  systemInstruction?: string,
-  apiSettings?: any
-): Promise<{ text: string }> => {
-  const response = await fetch('/api/ai/generate-text', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
-    },
-    body: JSON.stringify({ prompt, systemInstruction, ...apiSettings }),
-  });
-  if (!response.ok) throw new Error('AI proxy error');
-  return await response.json();
-};
-
-// Hàm generateTextWithJsonOutput: trả về JSON object
-export const generateTextWithJsonOutput = async <T,>(
-  prompt: string,
-  systemInstruction?: string,
-  apiSettings?: any
-): Promise<T> => {
-  const response = await fetch('/api/ai/generate-text-json', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
-    },
-    body: JSON.stringify({ prompt, systemInstruction, ...apiSettings }),
-  });
-  if (!response.ok) throw new Error('AI proxy error');
-  return await response.json();
-};
 import { API_BASE_URL } from '../config';
 
 export interface AIRequest {
@@ -51,6 +15,7 @@ export interface AIResponse {
   remainingCredits?: number;
 }
 
+// Hàm chính để gọi AI qua webadmin backend
 export const generateTextViaBackend = async (
   request: AIRequest,
   updateCreditFunction: (newCredit: number) => void
@@ -82,13 +47,69 @@ export const generateTextViaBackend = async (
   }
 };
 
+// Wrapper function để tương thích với các module cũ
+export const generateText = async (
+  prompt: string,
+  systemInstruction?: string,
+  useJsonOutput?: boolean,
+  apiSettings?: any
+): Promise<{ text: string }> => {
+  const request: AIRequest = {
+    prompt,
+    provider: apiSettings?.provider || 'gemini',
+    model: apiSettings?.model,
+    temperature: apiSettings?.temperature,
+    maxTokens: apiSettings?.maxTokens
+  };
+
+  const result = await generateTextViaBackend(request, (newCredit) => {
+    // Update credit if needed
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'AI generation failed');
+  }
+
+  return { text: result.text || '' };
+};
+
+// Wrapper function để tương thích với các module cũ
+export const generateTextWithJsonOutput = async <T,>(
+  prompt: string,
+  systemInstruction?: string,
+  apiSettings?: any
+): Promise<T> => {
+  const request: AIRequest = {
+    prompt,
+    provider: apiSettings?.provider || 'gemini',
+    model: apiSettings?.model,
+    temperature: apiSettings?.temperature,
+    maxTokens: apiSettings?.maxTokens
+  };
+
+  const result = await generateTextViaBackend(request, (newCredit) => {
+    // Update credit if needed
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'AI generation failed');
+  }
+
+  // Try to parse as JSON
+  try {
+    return JSON.parse(result.text || '{}');
+  } catch (e) {
+    throw new Error('Failed to parse JSON response');
+  }
+};
+
 export const generateImageViaBackend = async (
   prompt: string, 
   aspectRatio: string = "16:9",
   provider: 'gemini' | 'stability' = 'gemini'
 ): Promise<{ success: boolean; imageData?: string; error?: string }> => {
   try {
-    const response = await fetch('/api/ai/generate-image', {
+    const response = await fetch(`${API_BASE_URL}/ai/generate-image`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -16,8 +16,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText as generateGeminiText } from '../../services/geminiService';
-import { generateText as generateDeepSeekText } from '../../services/deepseekService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
 
@@ -38,8 +37,22 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     setModuleState(prev => ({ ...prev, ...updates }));
   };
   
-  const geminiApiKeyForService = apiSettings.provider === 'gemini' ? apiSettings.apiKey : undefined;
-  const deepseekApiKeyForService = apiSettings.provider === 'deepseek' ? apiSettings.apiKey : undefined;
+  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings) => {
+    const request = {
+      prompt,
+      provider: apiSettings?.provider || 'gemini'
+    };
+
+    const result = await generateTextViaBackend(request, (newCredit) => {
+      // Update credit if needed
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'AI generation failed');
+    }
+
+    return result.text || '';
+  };
 
   const { consumeCredit } = useAppContext();
 

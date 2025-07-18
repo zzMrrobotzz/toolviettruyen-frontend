@@ -14,8 +14,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText as generateGeminiText, generateTextWithJsonOutput as generateGeminiTextWithJsonOutput } from '../../services/geminiService';
-import { generateText as generateDeepSeekText } from '../../services/deepseekService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 
 interface YoutubeSeoModuleProps {
   apiSettings: ApiSettings;
@@ -23,16 +22,43 @@ interface YoutubeSeoModuleProps {
   setModuleState: React.Dispatch<React.SetStateAction<YoutubeSeoModuleState>>;
 }
 
-const generateText = (prompt: string, ...args: any[]) => {
-  if (apiSettings.provider === 'deepseek') {
-    return generateDeepSeekText(prompt, ...args);
+const generateText = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
+  const request = {
+    prompt,
+    provider: apiSettings?.provider || 'gemini'
+  };
+
+  const result = await generateTextViaBackend(request, (newCredit) => {
+    // Update credit if needed
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'AI generation failed');
   }
-  return generateGeminiText(prompt, ...args);
+
+  return { text: result.text || '' };
 };
 
-const generateTextWithJsonOutput = (prompt: string, ...args: any[]) => {
-  // Nếu deepseek không có hàm này thì chỉ dùng gemini
-  return generateGeminiTextWithJsonOutput(prompt, ...args);
+const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings): Promise<T> => {
+  const request = {
+    prompt,
+    provider: apiSettings?.provider || 'gemini'
+  };
+
+  const result = await generateTextViaBackend(request, (newCredit) => {
+    // Update credit if needed
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'AI generation failed');
+  }
+
+  // Try to parse as JSON
+  try {
+    return JSON.parse(result.text || '{}');
+  } catch (e) {
+    throw new Error('Failed to parse JSON response');
+  }
 };
 
 const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {

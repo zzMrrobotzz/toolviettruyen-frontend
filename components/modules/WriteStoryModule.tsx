@@ -10,8 +10,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText as generateGeminiText } from '../../services/geminiService';
-import { generateText as generateDeepSeekText } from '../../services/deepseekService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils'; // Added delay import
 import { Languages } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
@@ -24,16 +23,26 @@ interface WriteStoryModuleProps {
 }
 
 const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis }) => {
-  const generateText = (
+  const generateText = async (
     prompt: string,
     systemInstruction?: string,
     useJsonOutput?: boolean,
     apiSettings?: ApiSettings
   ) => {
-    if (apiSettings?.provider === 'deepseek') {
-      return generateDeepSeekText(prompt, systemInstruction, apiSettings);
+    const request = {
+      prompt,
+      provider: apiSettings?.provider || 'gemini'
+    };
+
+    const result = await generateTextViaBackend(request, (newCredit) => {
+      // Update credit if needed
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'AI generation failed');
     }
-    return generateGeminiText(prompt, systemInstruction, useJsonOutput, apiSettings);
+
+    return { text: result.text || '' };
   };
   
   const {
