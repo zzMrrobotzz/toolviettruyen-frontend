@@ -613,11 +613,13 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             }
             
             console.log('Rewrite completed');
+            console.log('Final rewritten text:', fullRewrittenText.trim());
             updateState({ 
                 rewrittenText: fullRewrittenText.trim(), 
                 loadingMessage: 'Hoàn thành!', 
                 progress: 100 
             });
+            console.log('State updated with rewritten text');
         } catch (e) {
             console.error('Rewrite error:', e);
             updateState({ 
@@ -677,6 +679,12 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
     };
     
     const anyLoading = loadingMessage !== null || isEditing;
+    console.log('Current state:', { 
+        rewrittenText: rewrittenText ? 'Has text' : 'No text', 
+        loadingMessage, 
+        isEditing, 
+        anyLoading 
+    });
     const userLevelDescriptions: { [key: number]: string } = {
         0: "Chỉ sửa lỗi chính tả và ngữ pháp cơ bản. Giữ nguyên 100% nội dung và văn phong gốc.",
         25: "Làm mới văn bản bằng cách thay đổi một số từ ngữ và cấu trúc câu. Giữ nguyên ý nghĩa, nhân vật, bối cảnh và cốt truyện chính.",
@@ -768,6 +776,17 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                          <button onClick={handlePostRewriteEdit} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">Biên Tập & Tinh Chỉnh</button>
                       </div>
                   </div>
+             )}
+             {!rewrittenText && !anyLoading && (
+                 <div className="mt-6 p-4 border rounded-lg bg-yellow-50">
+                     <h3 className="text-lg font-semibold mb-2 text-yellow-800">Debug Info:</h3>
+                     <p className="text-sm text-yellow-700">
+                         rewrittenText: {rewrittenText ? 'Has content' : 'Empty'}<br/>
+                         loadingMessage: {loadingMessage || 'null'}<br/>
+                         isEditing: {isEditing ? 'true' : 'false'}<br/>
+                         anyLoading: {anyLoading ? 'true' : 'false'}
+                     </p>
+                 </div>
              )}
          </div>
      );
