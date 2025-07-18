@@ -84,7 +84,12 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         }));
     };
 
-    const anyLoading = moduleState.quick.loadingMessage !== null || moduleState.quick.isEditing || moduleState.restructure.isLoading;
+    // Chỉ khóa tab khi tab hiện tại đang xử lý
+    const isQuickTabLoading = moduleState.quick.loadingMessage !== null || moduleState.quick.isEditing;
+    const isRestructureTabLoading = moduleState.restructure.isLoading;
+    
+    // Tab bị khóa chỉ khi tab hiện tại đang xử lý
+    const isCurrentTabLoading = moduleState.activeTab === 'quick' ? isQuickTabLoading : isRestructureTabLoading;
 
     return (
         <ModuleContainer title="🔄 Viết Lại & Tái Cấu Trúc">
@@ -95,7 +100,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
                     label="Tái Cấu Trúc & Biến Hóa"
                     icon={Wand2}
                     onClick={handleTabChange}
-                    disabled={anyLoading}
+                    disabled={isCurrentTabLoading}
                 />
                 <TabButton
                     tabId="quick"
@@ -103,7 +108,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
                     label="Viết Lại Nhanh (Slider)"
                     icon={Text}
                     onClick={handleTabChange}
-                    disabled={anyLoading}
+                    disabled={isCurrentTabLoading}
                 />
             </div>
             
