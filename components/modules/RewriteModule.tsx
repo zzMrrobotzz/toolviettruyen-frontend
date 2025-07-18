@@ -257,7 +257,7 @@ Chỉ trả về kế hoạch được đánh số. Không thêm bất kỳ văn
         }
         updateState({ isLoading: true, error: null, loadingMessage: 'Đang thực thi kế hoạch và viết lại...' });
         
-        const prompt = `Bạn là một chuyên gia viết lại truyện. Dựa trên kế hoạch đã được phê duyệt, hãy thực hiện viết lại văn bản gốc.
+        const prompt = `Bạn là một nhà văn chuyên nghiệp. Bạn đã tạo ra một kế hoạch viết lại và người dùng đã phê duyệt nó. Bây giờ, bạn phải thực hiện kế hoạch đó một cách hoàn hảo.
 
 **Văn bản gốc:**
 ---
@@ -270,9 +270,9 @@ ${rewritePlan}
 ---
 
 **Nhiệm vụ của bạn:**
-Thực hiện viết lại văn bản theo đúng kế hoạch đã được phê duyệt. Đảm bảo tuân thủ từng bước trong kế hoạch một cách chính xác.
-
-Chỉ trả về văn bản đã được viết lại. Không thêm bất kỳ văn bản nào khác.`;
+Viết lại "Văn bản gốc" bằng cách tuân thủ chính xác "Kế hoạch viết lại đã được phê duyệt".
+Đầu ra cuối cùng phải là câu chuyện hoàn chỉnh, đã được viết lại, bằng Tiếng Việt.
+Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch, văn bản gốc, hoặc bất kỳ giải thích nào khác.`;
         
         try {
             const executionResult = await generateText(prompt, undefined, false, apiSettings);
@@ -509,11 +509,11 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
                 let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
                 
                 const levelDescriptions: {[key: number]: string} = {
-                    0: "Chỉ sửa lỗi chính tả và ngữ pháp cơ bản. Giữ nguyên 100% nội dung và văn phong gốc.",
-                    25: "Làm mới văn bản bằng cách thay đổi một số từ ngữ và cấu trúc câu. Giữ nguyên ý nghĩa, nhân vật, bối cảnh và cốt truyện chính.",
-                    50: "Viết lại vừa phải từ ngữ và văn phong. Có thể thay đổi cấu trúc câu, từ vựng, một số chi tiết mô tả nhỏ. Tên nhân vật chính, cốt truyện chính PHẢI được giữ nguyên.",
-                    75: "Sáng tạo lại câu chuyện một cách đáng kể. Có thể thay đổi tên nhân vật, bối cảnh. Cốt truyện có thể có những phát triển mới nhưng PHẢI giữ được tinh thần của bản gốc.",
-                    100: "Viết lại hoàn toàn thành một kịch bản mới. Chỉ giữ lại 'linh hồn' (ý tưởng cốt lõi, chủ đề chính) của câu chuyện gốc."
+                    0: 'only fix spelling and grammar. Keep the original story 100%.',
+                    25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning and plot.',
+                    50: 'moderately rewrite the wording and style. You can change sentence structures and vocabulary, but MUST keep the main character names and core plot points.',
+                    75: 'creatively reimagine the story. You can change character names and some settings. The plot may have new developments, but it MUST retain the spirit of the original script.',
+                    100: 'completely rewrite into a new script. Only retain the "soul" (core idea, main theme) of the original story.'
                 };
                 const descriptionKey = Math.round(rewriteLevel / 25) * 25;
                 const levelDescription = levelDescriptions[descriptionKey];
