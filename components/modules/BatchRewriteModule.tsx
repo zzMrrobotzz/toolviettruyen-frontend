@@ -411,9 +411,22 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
 
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, concurrencyLimit));
     
-    const textGenerator = apiSettings.provider === 'deepseek'
-        ? (prompt: string, systemInstruction?: string) => generateDeepSeekText(prompt, systemInstruction, deepseekApiKeyForService)
-        : (prompt: string, systemInstruction?: string) => generateGeminiText(prompt, systemInstruction, undefined, geminiApiKeyForService).then(res => res.text);
+    const textGenerator = async (prompt: string, systemInstruction?: string) => {
+      const request = {
+        prompt,
+        provider: apiSettings.provider || 'gemini'
+      };
+
+      const result = await generateTextViaBackend(request, (newCredit) => {
+        // Update credit if needed
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
+      return result.text || '';
+    };
 
 
     updateState({
@@ -488,9 +501,22 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
         results: prev.results.map(r => r.id === resultId ? {...r, status: 'editing', progressMessage: "Đang tinh chỉnh lại..."} : r)
     }));
     
-    const textGenerator = apiSettings.provider === 'deepseek'
-        ? (prompt: string, systemInstruction?: string) => generateDeepSeekText(prompt, systemInstruction, deepseekApiKeyForService)
-        : (prompt: string, systemInstruction?: string) => generateGeminiText(prompt, systemInstruction, undefined, geminiApiKeyForService).then(res => res.text);
+    const textGenerator = async (prompt: string, systemInstruction?: string) => {
+      const request = {
+        prompt,
+        provider: apiSettings.provider || 'gemini'
+      };
+
+      const result = await generateTextViaBackend(request, (newCredit) => {
+        // Update credit if needed
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
+      return result.text || '';
+    };
 
 
     // Determine effective settings for the item
