@@ -46,6 +46,8 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
 
     const [isProcessing, setIsProcessing] = React.useState(false);
 
+    // Tất cả các onChange input/select/slider chỉ gọi updateStateInput, không reset rewrittenText
+    // Khi bấm nút Viết lại Văn bản, mới reset rewrittenText
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
             updateStateInput({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
@@ -59,7 +61,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
             setIsProcessing(false);
             return;
         }
-        // Chỉ xóa rewrittenText ở đây
+        // Chỉ reset rewrittenText ở đây
         setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: '', error: null, progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false } }));
         
         const CHUNK_CHAR_COUNT = 4000;
