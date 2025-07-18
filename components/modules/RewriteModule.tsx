@@ -65,8 +65,21 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         setModuleState(prev => ({
             ...prev,
             activeTab: tabId,
-            quick: { ...prev.quick, error: null, loadingMessage: null, editError: null, editLoadingMessage: null },
-            restructure: { ...prev.restructure, error: null, loadingMessage: null }
+            quick: { 
+                ...prev.quick, 
+                error: null, 
+                loadingMessage: null, 
+                editError: null, 
+                editLoadingMessage: null,
+                progress: 0,
+                isEditing: false
+            },
+            restructure: { 
+                ...prev.restructure, 
+                error: null, 
+                loadingMessage: null,
+                isLoading: false
+            }
         }));
     };
 
@@ -455,6 +468,18 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         isEditing, editError, editLoadingMessage, hasBeenEdited, translation
     } = state;
 
+    // Reset loading states on mount to prevent stuck states
+    useEffect(() => {
+        updateState({
+            loadingMessage: null,
+            isEditing: false,
+            editLoadingMessage: null,
+            progress: 0,
+            error: null,
+            editError: null
+        });
+    }, [updateState]);
+
     const generateText = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
         const request = {
             prompt,
@@ -476,14 +501,14 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         updateState({ translation: { ...translation, ...updates } });
     };
 
+    // Auto-set adaptContext based on language difference
     useEffect(() => {
         if (targetLanguage !== sourceLanguage) {
             updateState({ adaptContext: true }); 
         } else {
             updateState({ adaptContext: false });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [targetLanguage, sourceLanguage]);
+    }, [targetLanguage, sourceLanguage, updateState]);
 
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
