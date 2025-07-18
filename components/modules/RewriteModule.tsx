@@ -175,7 +175,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         alert("Đã sao chép!");
     };
     
-    const anyLoading = loadingMessage !== null || isEditing;
+    const anyLoading = (loadingMessage !== null || isEditing) && !!originalText.trim();
     const userLevelDescriptions: { [key: number]: string } = {
         0: "Chỉ sửa lỗi chính tả và ngữ pháp cơ bản. Giữ nguyên 100% nội dung và văn phong gốc.",
         25: "Làm mới văn bản bằng cách thay đổi một số từ ngữ và cấu trúc câu. Giữ nguyên ý nghĩa, nhân vật, bối cảnh và cốt truyện chính.",
