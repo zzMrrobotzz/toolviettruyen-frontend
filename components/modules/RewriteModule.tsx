@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { 
     ApiSettings, 
     RewriteModuleState,
@@ -65,42 +65,12 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         setModuleState(prev => ({
             ...prev,
             activeTab: tabId,
-            quick: { 
-                ...prev.quick, 
-                error: null, 
-                loadingMessage: null, 
-                editError: null, 
-                editLoadingMessage: null,
-                progress: 0,
-                isEditing: false
-            },
-            restructure: { 
-                ...prev.restructure, 
-                error: null, 
-                loadingMessage: null,
-                isLoading: false
-            }
+            quick: { ...prev.quick, error: null, loadingMessage: null, editError: null, editLoadingMessage: null },
+            restructure: { ...prev.restructure, error: null, loadingMessage: null }
         }));
     };
 
     const anyLoading = moduleState.quick.loadingMessage !== null || moduleState.quick.isEditing || moduleState.restructure.isLoading;
-
-    const generateText = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
-        const request = {
-            prompt,
-            provider: apiSettings?.provider || 'gemini'
-        };
-
-        const result = await generateTextViaBackend(request, (newCredit) => {
-            // Update credit if needed
-        });
-
-        if (!result.success) {
-            throw new Error(result.error || 'AI generation failed');
-        }
-
-        return { text: result.text || '' };
-    };
 
     return (
         <ModuleContainer title="🔄 Viết Lại & Tái Cấu Trúc">
@@ -160,33 +130,18 @@ const RestructureTab: React.FC<RestructureTabProps> = ({ apiSettings, state, upd
         isLoading, loadingMessage, error 
     } = state;
 
-    const generateText = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
-        const request = {
-            prompt,
-            provider: apiSettings?.provider || 'gemini'
-        };
-
-        const result = await generateTextViaBackend(request, (newCredit) => {
-            // Update credit if needed
-        });
-
-        if (!result.success) {
-            throw new Error(result.error || 'AI generation failed');
-        }
-
-        return { text: result.text || '' };
-    };
-
     const handleGeneratePlan = async () => {
         if (!originalText.trim()) {
             updateState({ error: 'Vui lòng nhập văn bản gốc.' });
             return;
         }
+        
         const hasCredits = await consumeCredit(1);
         if (!hasCredits) {
             updateState({ error: 'Không đủ credit để thực hiện thao tác này.' });
             return;
         }
+        
         updateState({ isLoading: true, error: null, loadingMessage: 'Đang tạo kế hoạch tái cấu trúc...' });
         
         let goalDescription = `Mục tiêu là ${goal}`;
@@ -255,8 +210,15 @@ Ví dụ, nếu mục tiêu là thay đổi góc nhìn, kế hoạch có thể l
 Chỉ trả về kế hoạch được đánh số. Không thêm bất kỳ văn bản nào khác.`;
         
         try {
-            const planResult = await generateText(prompt, undefined, false, apiSettings);
-            updateState({ rewritePlan: planResult.text, step: 'reviewing', isLoading: false, loadingMessage: null });
+            const result = await generateTextViaBackend({ prompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
+                // Update credit if needed
+            });
+            
+            if (!result.success) {
+                throw new Error(result.error || 'AI generation failed');
+            }
+            
+            updateState({ rewritePlan: result.text, step: 'reviewing', isLoading: false, loadingMessage: null });
         } catch (e) {
             updateState({ error: `Lỗi khi tạo kế hoạch: ${(e as Error).message}`, isLoading: false, loadingMessage: null });
         }
@@ -268,6 +230,7 @@ Chỉ trả về kế hoạch được đánh số. Không thêm bất kỳ văn
             updateState({ error: 'Không đủ credit để thực hiện thao tác này.' });
             return;
         }
+        
         updateState({ isLoading: true, error: null, loadingMessage: 'Đang thực thi kế hoạch và viết lại...' });
         
         const prompt = `Bạn là một nhà văn chuyên nghiệp. Bạn đã tạo ra một kế hoạch viết lại và người dùng đã phê duyệt nó. Bây giờ, bạn phải thực hiện kế hoạch đó một cách hoàn hảo.
@@ -286,10 +249,17 @@ ${rewritePlan}
 Viết lại "Văn bản gốc" bằng cách tuân thủ chính xác "Kế hoạch viết lại đã được phê duyệt".
 Đầu ra cuối cùng phải là câu chuyện hoàn chỉnh, đã được viết lại, bằng Tiếng Việt.
 Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch, văn bản gốc, hoặc bất kỳ giải thích nào khác.`;
-        
+
         try {
-            const executionResult = await generateText(prompt, undefined, false, apiSettings);
-            updateState({ rewrittenText: executionResult.text, step: 'completed', isLoading: false, loadingMessage: null });
+            const result = await generateTextViaBackend({ prompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
+                // Update credit if needed
+            });
+            
+            if (!result.success) {
+                throw new Error(result.error || 'AI generation failed');
+            }
+            
+            updateState({ rewrittenText: result.text, step: 'completed', isLoading: false, loadingMessage: null });
         } catch (e) {
             updateState({ error: `Lỗi khi thực thi kế hoạch: ${(e as Error).message}`, isLoading: false, loadingMessage: null });
         }
@@ -450,7 +420,7 @@ Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch,
 };
 
 // =================================================================================
-// Simple "Quick Rewrite" Tab Component
+// Classic "Quick Rewrite" Tab Component
 // =================================================================================
 
 interface QuickRewriteTabProps {
@@ -468,45 +438,10 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         isEditing, editError, editLoadingMessage, hasBeenEdited, translation
     } = state;
 
-    // Reset loading states on mount to prevent stuck states
-    useEffect(() => {
-        updateState({
-            loadingMessage: null,
-            isEditing: false,
-            editLoadingMessage: null,
-            progress: 0,
-            error: null,
-            editError: null
-        });
-    }, [updateState]);
-
-    // Debug effect to track rewrittenText changes
-    useEffect(() => {
-        console.log('rewrittenText changed:', rewrittenText ? 'Has content' : 'Empty');
-    }, [rewrittenText]);
-
-    const generateText = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
-        const request = {
-            prompt,
-            provider: apiSettings?.provider || 'gemini'
-        };
-
-        const result = await generateTextViaBackend(request, (newCredit) => {
-            // Update credit if needed
-        });
-
-        if (!result.success) {
-            throw new Error(result.error || 'AI generation failed');
-        }
-
-        return { text: result.text || '' };
-    };
-
     const updateTranslationState = (updates: Partial<RewriteModuleState['quick']['translation']>) => {
         updateState({ translation: { ...translation, ...updates } });
     };
 
-    // Auto-set adaptContext based on language difference
     useEffect(() => {
         if (targetLanguage !== sourceLanguage) {
             updateState({ adaptContext: true }); 
@@ -516,44 +451,26 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
     }, [targetLanguage, sourceLanguage, updateState]);
 
     const handleSingleRewrite = async () => {
-        console.log('handleSingleRewrite called');
-        
         if (!originalText.trim()) {
             updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
             return;
         }
         
-        console.log('Checking credits...');
         const hasCredits = await consumeCredit(1);
         if (!hasCredits) {
             updateState({ error: 'Không đủ credit để thực hiện thao tác này.' });
             return;
         }
         
-        console.log('Starting rewrite process...');
-        updateState({ 
-            error: null, 
-            rewrittenText: '', 
-            progress: 0, 
-            loadingMessage: 'Đang chuẩn bị...', 
-            hasBeenEdited: false 
-        });
+        updateState({ error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false });
         
         const CHUNK_CHAR_COUNT = 4000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
         let fullRewrittenText = '';
 
         try {
-            console.log(`Processing ${numChunks} chunks...`);
-            
             for (let i = 0; i < numChunks; i++) {
-                console.log(`Processing chunk ${i + 1}/${numChunks}`);
-                
-                updateState({ 
-                    progress: Math.round(((i + 1) / numChunks) * 100), 
-                    loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` 
-                });
-                
+                updateState({ progress: Math.round(((i + 1) / numChunks) * 100), loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` });
                 const textChunk = originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
                 
                 let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
@@ -608,56 +525,38 @@ ${textChunk}
 Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
 `;
                 
-                console.log('Calling generateText...');
                 await delay(500); // Simulate API call delay
                 const result = await generateTextViaBackend({ prompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
                     // Update credit if needed
                 });
-                console.log('generateText result:', result);
                 
                 if (!result.success) {
                     throw new Error(result.error || 'AI generation failed');
                 }
                 
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + result.text.trim();
-                console.log('Updating state with chunk result:', fullRewrittenText.substring(0, 100) + '...');
                 updateState({ rewrittenText: fullRewrittenText }); // Update UI progressively
             }
-            
-            console.log('Rewrite completed');
-            console.log('Final rewritten text:', fullRewrittenText.trim());
-            
-            // Force state update with new object
-            const finalText = fullRewrittenText.trim();
-            updateState({ 
-                rewrittenText: finalText,
-                loadingMessage: 'Hoàn thành!',
-                progress: 100
-            });
-            
-            console.log('State updated with rewritten text');
+            updateState({ rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 });
         } catch (e) {
-            console.error('Rewrite error:', e);
-            updateState({ 
-                error: `Lỗi viết lại: ${(e as Error).message}`, 
-                loadingMessage: 'Lỗi!', 
-                progress: 0 
-            });
+            updateState({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
         } finally {
             setTimeout(() => updateState({ loadingMessage: null }), 3000);
         }
     };
 
     const handlePostRewriteEdit = async () => {
-         if (!rewrittenText.trim()) {
+        if (!rewrittenText.trim()) {
             updateState({ editError: 'Không có văn bản để tinh chỉnh.' });
             return;
         }
+        
         const hasCredits = await consumeCredit(1);
         if (!hasCredits) {
             updateState({ editError: 'Không đủ credit để thực hiện thao tác này.' });
             return;
         }
+        
         updateState({ isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false });
         
         const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.
@@ -691,7 +590,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         } catch (e) {
             updateState({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
         } finally {
-             setTimeout(() => updateState({ editLoadingMessage: null }), 3000);
+            setTimeout(() => updateState({ editLoadingMessage: null }), 3000);
         }
     };
     
@@ -702,12 +601,6 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
     };
     
     const anyLoading = loadingMessage !== null || isEditing;
-    console.log('Current state:', { 
-        rewrittenText: rewrittenText ? 'Has text' : 'No text', 
-        loadingMessage, 
-        isEditing, 
-        anyLoading 
-    });
     const userLevelDescriptions: { [key: number]: string } = {
         0: "Chỉ sửa lỗi chính tả và ngữ pháp cơ bản. Giữ nguyên 100% nội dung và văn phong gốc.",
         25: "Làm mới văn bản bằng cách thay đổi một số từ ngữ và cấu trúc câu. Giữ nguyên ý nghĩa, nhân vật, bối cảnh và cốt truyện chính.",
@@ -726,93 +619,64 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
             <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
                 <h3 className="text-xl font-semibold text-gray-800">Cài đặt Viết lại Nhanh</h3>
                  <div>
-                     <div className="flex justify-between items-center mb-1">
-                         <label htmlFor="rewriteSlider" className="text-sm font-medium text-gray-700">Mức độ thay đổi:</label>
-                         <span className="bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full">{rewriteLevel}%</span>
-                     </div>
-                     <input type="range" id="rewriteSlider" min="0" max="100" step="25" value={rewriteLevel} onChange={(e) => updateState({ rewriteLevel: parseInt(e.target.value)})} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" disabled={anyLoading}/>
-                     <div className="mt-2 text-sm text-gray-600 bg-indigo-50 p-3 rounded-md border border-indigo-200">
-                         <strong>Giải thích mức {rewriteLevel}%:</strong> {getCurrentLevelDescription()}
-                     </div>
-                 </div>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                     <div>
-                         <label htmlFor="quickSourceLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ gốc:</label>
-                         <select id="quickSourceLang" value={sourceLanguage} onChange={(e) => updateState({ sourceLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
-                         {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                         </select>
-                     </div>
-                     <div>
-                         <label htmlFor="quickTargetLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ đầu ra:</label>
-                         <select id="quickTargetLang" value={targetLanguage} onChange={(e) => updateState({ targetLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
-                         {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                         </select>
-                     </div>
-                     <div>
-                         <label htmlFor="quickRewriteStyle" className="block text-sm font-medium text-gray-700 mb-1">Phong cách viết lại:</label>
-                         <select id="quickRewriteStyle" value={rewriteStyle} onChange={(e) => updateState({ rewriteStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
-                         {REWRITE_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                         </select>
-                     </div>
-                 </div>
-                  {rewriteStyle === 'custom' && (
-                     <div>
-                         <label htmlFor="quickCustomStyle" className="block text-sm font-medium text-gray-700 mb-1">Hướng dẫn tùy chỉnh:</label>
-                         <textarea id="quickCustomStyle" value={customRewriteStyle} onChange={(e) => updateState({ customRewriteStyle: e.target.value })} rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}/>
-                     </div>
-                 )}
+                    <div className="flex justify-between items-center mb-1">
+                        <label htmlFor="rewriteSlider" className="text-sm font-medium text-gray-700">Mức độ thay đổi:</label>
+                        <span className="bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full">{rewriteLevel}%</span>
+                    </div>
+                    <input type="range" id="rewriteSlider" min="0" max="100" step="25" value={rewriteLevel} onChange={(e) => updateState({ rewriteLevel: parseInt(e.target.value)})} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" disabled={anyLoading}/>
+                    <div className="mt-2 text-sm text-gray-600 bg-indigo-50 p-3 rounded-md border border-indigo-200">
+                        <strong>Giải thích mức {rewriteLevel}%:</strong> {getCurrentLevelDescription()}
+                    </div>
+                </div>
+                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div>
+                        <label htmlFor="quickSourceLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ gốc:</label>
+                        <select id="quickSourceLang" value={sourceLanguage} onChange={(e) => updateState({ sourceLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
+                        {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="quickTargetLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ đầu ra:</label>
+                        <select id="quickTargetLang" value={targetLanguage} onChange={(e) => updateState({ targetLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
+                        {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="quickRewriteStyle" className="block text-sm font-medium text-gray-700 mb-1">Phong cách viết lại:</label>
+                        <select id="quickRewriteStyle" value={rewriteStyle} onChange={(e) => updateState({ rewriteStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
+                        {REWRITE_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                    </div>
+                </div>
+                 {rewriteStyle === 'custom' && (
+                    <div>
+                        <label htmlFor="quickCustomStyle" className="block text-sm font-medium text-gray-700 mb-1">Hướng dẫn tùy chỉnh:</label>
+                        <textarea id="quickCustomStyle" value={customRewriteStyle} onChange={(e) => updateState({ customRewriteStyle: e.target.value })} rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}/>
+                    </div>
+                )}
             </div>
              <div>
-                 <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
-                 <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateState({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={anyLoading}></textarea>
+                <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
+                <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateState({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={anyLoading}></textarea>
             </div>
-             <div className="flex gap-2">
-                 <button onClick={handleSingleRewrite} disabled={anyLoading || !originalText.trim()} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
-                     Viết lại Văn bản
-                 </button>
-                 {anyLoading && (
-                     <button 
-                         onClick={() => updateState({ 
-                             loadingMessage: null, 
-                             isEditing: false, 
-                             editLoadingMessage: null,
-                             progress: 0,
-                             error: null,
-                             editError: null
-                         })} 
-                         className="px-4 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600"
-                         title="Reset trạng thái nếu bị treo"
-                     >
-                         Reset
-                     </button>
-                 )}
-             </div>
-             {anyLoading && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
-             {error && <ErrorAlert message={error} />}
-             {editError && <ErrorAlert message={editError} />}
-             {rewrittenText && !anyLoading && (
-                  <div className="mt-6 p-4 border rounded-lg bg-gray-50">
-                      <h3 className="text-lg font-semibold mb-2">Văn bản đã viết lại:</h3>
-                      <textarea value={rewrittenText} readOnly rows={10} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"/>
-                      <div className="mt-3 flex gap-2">
-                         <button onClick={() => copyToClipboard(rewrittenText)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Sao chép</button>
-                         <button onClick={handlePostRewriteEdit} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">Biên Tập & Tinh Chỉnh</button>
-                      </div>
-                  </div>
-             )}
-             {!rewrittenText && !anyLoading && (
-                 <div className="mt-6 p-4 border rounded-lg bg-yellow-50">
-                     <h3 className="text-lg font-semibold mb-2 text-yellow-800">Debug Info:</h3>
-                     <p className="text-sm text-yellow-700">
-                         rewrittenText: {rewrittenText ? 'Has content' : 'Empty'}<br/>
-                         loadingMessage: {loadingMessage || 'null'}<br/>
-                         isEditing: {isEditing ? 'true' : 'false'}<br/>
-                         anyLoading: {anyLoading ? 'true' : 'false'}
-                     </p>
+             <button onClick={handleSingleRewrite} disabled={anyLoading || !originalText.trim()} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
+                Viết lại Văn bản
+            </button>
+            {anyLoading && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
+            {error && <ErrorAlert message={error} />}
+            {editError && <ErrorAlert message={editError} />}
+            {rewrittenText && !anyLoading && (
+                 <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+                     <h3 className="text-lg font-semibold mb-2">Văn bản đã viết lại:</h3>
+                     <textarea value={rewrittenText} readOnly rows={10} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"/>
+                     <div className="mt-3 flex gap-2">
+                        <button onClick={() => copyToClipboard(rewrittenText)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Sao chép</button>
+                        <button onClick={handlePostRewriteEdit} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">Biên Tập & Tinh Chỉnh</button>
+                     </div>
                  </div>
-             )}
-         </div>
-     );
+            )}
+        </div>
+    );
 };
 
 export default RewriteModule;
