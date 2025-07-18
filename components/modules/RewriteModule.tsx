@@ -463,6 +463,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         }
     }, [targetLanguage, sourceLanguage]);
 
+    // Logic tương tự như RestructureTab - chỉ xử lý khi click button
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
             updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
@@ -607,6 +608,20 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         }
     };
     
+    const resetQuickRewrite = () => {
+        updateState({
+            originalText: '',
+            rewrittenText: '',
+            error: null,
+            progress: 0,
+            loadingMessage: null,
+            isEditing: false,
+            editError: null,
+            editLoadingMessage: null,
+            hasBeenEdited: false,
+        });
+    };
+    
     const copyToClipboard = (text: string) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
@@ -624,69 +639,92 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
     const getCurrentLevelDescription = () => userLevelDescriptions[Math.round(rewriteLevel / 25) * 25];
 
     return (
-         <div className="space-y-6 animate-fadeIn">
-            <InfoBox>
-                <strong>Viết Lại Nhanh.</strong> Sử dụng thanh trượt để điều chỉnh mức độ thay đổi từ chỉnh sửa nhẹ đến sáng tạo hoàn toàn. Lý tưởng cho các tác vụ viết lại nhanh chóng.
-            </InfoBox>
-            
-            <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
-                <h3 className="text-xl font-semibold text-gray-800">Cài đặt Viết lại Nhanh</h3>
-                 <div>
-                    <div className="flex justify-between items-center mb-1">
-                        <label htmlFor="rewriteSlider" className="text-sm font-medium text-gray-700">Mức độ thay đổi:</label>
-                        <span className="bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full">{rewriteLevel}%</span>
-                    </div>
-                    <input type="range" id="rewriteSlider" min="0" max="100" step="25" value={rewriteLevel} onChange={(e) => updateState({ rewriteLevel: parseInt(e.target.value)})} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" disabled={anyLoading}/>
-                    <div className="mt-2 text-sm text-gray-600 bg-indigo-50 p-3 rounded-md border border-indigo-200">
-                        <strong>Giải thích mức {rewriteLevel}%:</strong> {getCurrentLevelDescription()}
-                    </div>
-                </div>
-                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div>
-                        <label htmlFor="quickSourceLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ gốc:</label>
-                        <select id="quickSourceLang" value={sourceLanguage} onChange={(e) => updateState({ sourceLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
-                        {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="quickTargetLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ đầu ra:</label>
-                        <select id="quickTargetLang" value={targetLanguage} onChange={(e) => updateState({ targetLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
-                        {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="quickRewriteStyle" className="block text-sm font-medium text-gray-700 mb-1">Phong cách viết lại:</label>
-                        <select id="quickRewriteStyle" value={rewriteStyle} onChange={(e) => updateState({ rewriteStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}>
-                        {REWRITE_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                    </div>
-                </div>
-                 {rewriteStyle === 'custom' && (
-                    <div>
-                        <label htmlFor="quickCustomStyle" className="block text-sm font-medium text-gray-700 mb-1">Hướng dẫn tùy chỉnh:</label>
-                        <textarea id="quickCustomStyle" value={customRewriteStyle} onChange={(e) => updateState({ customRewriteStyle: e.target.value })} rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg" disabled={anyLoading}/>
-                    </div>
-                )}
-            </div>
-             <div>
-                <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
-                <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateState({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={anyLoading}></textarea>
-            </div>
-             <button onClick={handleSingleRewrite} disabled={anyLoading || !originalText.trim()} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
-                Viết lại Văn bản
-            </button>
+        <div className="animate-fadeIn">
             {anyLoading && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
             {error && <ErrorAlert message={error} />}
             {editError && <ErrorAlert message={editError} />}
-            {rewrittenText && !anyLoading && (
-                 <div className="mt-6 p-4 border rounded-lg bg-gray-50">
-                     <h3 className="text-lg font-semibold mb-2">Văn bản đã viết lại:</h3>
-                     <textarea value={rewrittenText} readOnly rows={10} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"/>
-                     <div className="mt-3 flex gap-2">
-                        <button onClick={() => copyToClipboard(rewrittenText)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Sao chép</button>
-                        <button onClick={handlePostRewriteEdit} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">Biên Tập & Tinh Chỉnh</button>
-                     </div>
-                 </div>
+            {!anyLoading && !error && !editError && (
+                <>
+                    {!rewrittenText && (
+                        <div className="space-y-6">
+                            <InfoBox>
+                                <strong>Viết Lại Nhanh.</strong> Sử dụng thanh trượt để điều chỉnh mức độ thay đổi từ chỉnh sửa nhẹ đến sáng tạo hoàn toàn. Lý tưởng cho các tác vụ viết lại nhanh chóng.
+                            </InfoBox>
+                            
+                            <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
+                                <h3 className="text-xl font-semibold text-gray-800">Cài đặt Viết lại Nhanh</h3>
+                                 <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label htmlFor="rewriteSlider" className="text-sm font-medium text-gray-700">Mức độ thay đổi:</label>
+                                        <span className="bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full">{rewriteLevel}%</span>
+                                    </div>
+                                    <input type="range" id="rewriteSlider" min="0" max="100" step="25" value={rewriteLevel} onChange={(e) => updateState({ rewriteLevel: parseInt(e.target.value)})} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"/>
+                                    <div className="mt-2 text-sm text-gray-600 bg-indigo-50 p-3 rounded-md border border-indigo-200">
+                                        <strong>Giải thích mức {rewriteLevel}%:</strong> {getCurrentLevelDescription()}
+                                    </div>
+                                </div>
+                                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div>
+                                        <label htmlFor="quickSourceLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ gốc:</label>
+                                        <select id="quickSourceLang" value={sourceLanguage} onChange={(e) => updateState({ sourceLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg">
+                                        {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="quickTargetLang" className="block text-sm font-medium text-gray-700 mb-1">Ngôn ngữ đầu ra:</label>
+                                        <select id="quickTargetLang" value={targetLanguage} onChange={(e) => updateState({ targetLanguage: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg">
+                                        {HOOK_LANGUAGE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="quickRewriteStyle" className="block text-sm font-medium text-gray-700 mb-1">Phong cách viết lại:</label>
+                                        <select id="quickRewriteStyle" value={rewriteStyle} onChange={(e) => updateState({ rewriteStyle: e.target.value })} className="w-full p-3 border-2 border-gray-300 rounded-lg">
+                                        {REWRITE_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                 {rewriteStyle === 'custom' && (
+                                    <div>
+                                        <label htmlFor="quickCustomStyle" className="block text-sm font-medium text-gray-700 mb-1">Hướng dẫn tùy chỉnh:</label>
+                                        <textarea id="quickCustomStyle" value={customRewriteStyle} onChange={(e) => updateState({ customRewriteStyle: e.target.value })} rows={2} className="w-full p-3 border-2 border-gray-300 rounded-lg"/>
+                                    </div>
+                                )}
+                            </div>
+                             <div>
+                                <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
+                                <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateState({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..."></textarea>
+                            </div>
+                             <button onClick={handleSingleRewrite} disabled={!originalText.trim()} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
+                                Viết lại Văn bản
+                            </button>
+                        </div>
+                    )}
+                    
+                    {rewrittenText && (
+                        <div className="space-y-6">
+                            <InfoBox variant="info">
+                                <strong>Hoàn thành!</strong> Dưới đây là kết quả văn bản đã được viết lại.
+                            </InfoBox>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                 <div>
+                                     <h3 className="text-lg font-semibold text-gray-700 mb-2">Văn bản Gốc</h3>
+                                     <textarea value={originalText} readOnly rows={15} className="w-full p-2 border border-gray-200 bg-gray-100 rounded-md"/>
+                                 </div>
+                                 <div>
+                                     <h3 className="text-lg font-semibold text-green-700 mb-2">Văn bản Đã Viết lại</h3>
+                                     <textarea value={rewrittenText} readOnly rows={15} className="w-full p-3 border-2 border-green-300 bg-green-50 rounded-lg"/>
+                                 </div>
+                            </div>
+                            <div className="flex gap-4">
+                                <button onClick={() => copyToClipboard(rewrittenText)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Sao chép</button>
+                                <button onClick={handlePostRewriteEdit} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">Biên Tập & Tinh Chỉnh</button>
+                                <button onClick={resetQuickRewrite} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                                    <GitCompareArrows className="inline-block mr-2" size={20}/> Viết lại Văn bản mới
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
