@@ -430,7 +430,6 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         } else {
             updateState({ adaptContext: false });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetLanguage, sourceLanguage]);
 
     const handleSingleRewrite = async () => {

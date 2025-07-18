@@ -181,7 +181,18 @@ const App: React.FC = () => {
     },
   };
 
-  const [rewriteState, setRewriteState] = useState<RewriteModuleState>(initialRewriteState);
+  const [rewriteState, setRewriteState] = useState<RewriteModuleState>(() => {
+    const savedState = localStorage.getItem('rewriteModuleState_v1');
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState);
+        return { ...initialRewriteState, ...parsed };
+      } catch (e) {
+        console.error("Failed to parse rewriteModuleState from localStorage", e);
+      }
+    }
+    return initialRewriteState;
+  });
   
   const [analysisState, setAnalysisState] = useState<AnalysisModuleState>({
     sourceText: '', analysisFactors: [], suggestions: '', improvedStory: '', viralOutlineAnalysisResult: '',
