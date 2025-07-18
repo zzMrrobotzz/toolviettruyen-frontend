@@ -170,8 +170,17 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 }
                 
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + result.text.trim();
+                console.log('Updating rewrittenText:', { 
+                    chunkIndex: i + 1, 
+                    fullLength: fullRewrittenText.length,
+                    chunkText: result.text.trim().substring(0, 100) + '...'
+                });
                 updateState({ rewrittenText: fullRewrittenText }); // Update UI progressively
             }
+            console.log('Final rewrittenText:', { 
+                finalLength: fullRewrittenText.trim().length,
+                finalText: fullRewrittenText.trim().substring(0, 200) + '...'
+            });
             updateState({ rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 });
         } catch (e) {
             updateState({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
@@ -258,7 +267,8 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         editLoadingMessage,
         anyLoading,
         error,
-        editError
+        editError,
+        rewrittenText: rewrittenText ? `Length: ${rewrittenText.length}` : 'null/empty'
     });
     const userLevelDescriptions: { [key: number]: string } = {
         0: "Chỉ sửa lỗi chính tả và ngữ pháp cơ bản. Giữ nguyên 100% nội dung và văn phong gốc.",
