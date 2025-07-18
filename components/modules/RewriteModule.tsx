@@ -63,11 +63,23 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         setModuleState(prev => ({ ...prev, restructure: { ...prev.restructure, ...updates } }));
     };
     
+    // Khi chuyển tab sang quick, reset toàn bộ trạng thái liên quan (trừ originalText)
     const handleTabChange = (tabId: RewriteActiveTab) => {
         setModuleState(prev => ({
             ...prev,
             activeTab: tabId,
-            quick: { ...prev.quick, error: null, loadingMessage: null, editError: null, editLoadingMessage: null },
+            quick: {
+                ...prev.quick,
+                error: null,
+                loadingMessage: null,
+                editError: null,
+                editLoadingMessage: null,
+                progress: 0,
+                isEditing: false,
+                rewrittenText: '',
+                hasBeenEdited: false,
+                // giữ lại originalText
+            },
             restructure: { ...prev.restructure, error: null, loadingMessage: null }
         }));
     };
@@ -424,15 +436,17 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         updateState({ translation: { ...translation, ...updates } });
     };
 
-    // Reset loading states on mount to prevent auto-processing
+    // Reset toàn bộ trạng thái liên quan khi mount (trừ originalText)
     useEffect(() => {
-        updateState({ 
-            loadingMessage: null, 
-            progress: 0, 
-            error: null, 
-            isEditing: false, 
-            editError: null, 
-            editLoadingMessage: null 
+        updateState({
+            loadingMessage: null,
+            progress: 0,
+            error: null,
+            isEditing: false,
+            editError: null,
+            editLoadingMessage: null,
+            rewrittenText: '',
+            hasBeenEdited: false,
         });
     }, []);
 
