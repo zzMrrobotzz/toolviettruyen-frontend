@@ -4,7 +4,9 @@ import {
     ApiSettings, 
     RewriteModuleState,
     RewriteActiveTab,
-    RewriteGoal
+    RewriteGoal,
+    QuickRewriteState,
+    RestructureRewriteState
 } from '../../types'; 
 import { HOOK_LANGUAGE_OPTIONS, REWRITE_STYLE_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
@@ -53,11 +55,11 @@ const TabButton: React.FC<{
 const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
     const { consumeCredit } = useAppContext();
 
-    const updateQuickState = (updates: Partial<RewriteModuleState['quick']>) => {
+    const updateQuickState = (updates: Partial<QuickRewriteState>) => {
         setModuleState(prev => ({ ...prev, quick: { ...prev.quick, ...updates } }));
     };
 
-    const updateRestructureState = (updates: Partial<RewriteModuleState['restructure']>) => {
+    const updateRestructureState = (updates: Partial<RestructureRewriteState>) => {
         setModuleState(prev => ({ ...prev, restructure: { ...prev.restructure, ...updates } }));
     };
     
@@ -118,8 +120,8 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
 
 interface RestructureTabProps {
     apiSettings: ApiSettings;
-    state: RewriteModuleState['restructure'];
-    updateState: (updates: Partial<RewriteModuleState['restructure']>) => void;
+    state: RestructureRewriteState;
+    updateState: (updates: Partial<RestructureRewriteState>) => void;
 }
 
 const RestructureTab: React.FC<RestructureTabProps> = ({ apiSettings, state, updateState }) => {
@@ -261,172 +263,152 @@ Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch,
             
             updateState({ rewrittenText: result.text, step: 'completed', isLoading: false, loadingMessage: null });
         } catch (e) {
-            updateState({ error: `Lỗi khi thực thi kế hoạch: ${(e as Error).message}`, isLoading: false, loadingMessage: null });
+             updateState({ error: `Lỗi khi thực thi kế hoạch: ${(e as Error).message}`, isLoading: false, loadingMessage: null });
         }
     };
-    
+
     const resetRestructure = () => {
         updateState({
             step: 'planning',
             originalText: '',
-            goal: 'changeStyle',
-            perspectiveCharacter: '',
-            targetGenre: 'Ngôn tình lãng mạn',
-            customTargetGenre: '',
-            targetStyle: REWRITE_STYLE_OPTIONS[0].value,
-            customTargetStyle: '',
             rewritePlan: '',
             rewrittenText: '',
-            isLoading: false,
-            loadingMessage: null,
             error: null,
+            isLoading: false,
+            loadingMessage: null
         });
     };
-
+    
+    // UI for Planning Step
     const renderPlanningStep = () => (
         <div className="space-y-6">
             <InfoBox>
-                <strong>Tái Cấu Trúc & Biến Hóa.</strong> Tạo kế hoạch chi tiết trước khi viết lại, đảm bảo kết quả chính xác theo mục tiêu của bạn.
+                <strong>Bước 1: Lập Kế hoạch.</strong> Cung cấp văn bản gốc và chọn mục tiêu tái cấu trúc. AI sẽ tạo một kế hoạch để bạn xem xét trước khi thực hiện.
             </InfoBox>
+            <div>
+                <label htmlFor="restructureOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
+                <textarea 
+                    id="restructureOriginalText" 
+                    value={originalText} 
+                    onChange={e => updateState({ originalText: e.target.value })} 
+                    rows={10} 
+                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
+                    placeholder="Dán văn bản cần tái cấu trúc vào đây..."
+                    disabled={isLoading}
+                />
+            </div>
             
-            <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
-                <h3 className="text-xl font-semibold text-gray-800">Cài đặt Tái Cấu Trúc</h3>
-                
+             <div>
+                <label htmlFor="rewriteGoal" className="block text-sm font-medium text-gray-700 mb-1">Mục tiêu Tái cấu trúc:</label>
+                <select id="rewriteGoal" value={goal} onChange={e => updateState({ goal: e.target.value as RewriteGoal })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" disabled={isLoading}>
+                    <option value="changeStyle">Thay đổi Văn phong</option>
+                    <option value="changePerspective">Thay đổi Góc nhìn</option>
+                    <option value="summarize">Rút gọn & Tóm tắt</option>
+                    <option value="expand">Mở rộng & Làm chi tiết</option>
+                    <option value="changeGenre">Chuyển Thể loại</option>
+                </select>
+            </div>
+            
+            {/* Conditional Inputs */}
+            {goal === 'changePerspective' && (
                 <div>
-                    <label htmlFor="restructureOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
-                    <textarea 
-                        id="restructureOriginalText" 
-                        value={originalText} 
-                        onChange={e => updateState({ originalText: e.target.value })}
-                        rows={6} 
-                        className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" 
-                        placeholder="Nhập văn bản cần tái cấu trúc..."
-                        disabled={isLoading}
-                    />
+                    <label htmlFor="perspectiveCharacter" className="block text-sm font-medium text-gray-700 mb-1">Tên nhân vật (cho góc nhìn mới):</label>
+                    <input type="text" id="perspectiveCharacter" value={perspectiveCharacter} onChange={e => updateState({ perspectiveCharacter: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading} />
                 </div>
-                
-                <div>
-                    <label htmlFor="rewriteGoal" className="block text-sm font-medium text-gray-700 mb-1">Mục tiêu tái cấu trúc:</label>
-                    <select id="rewriteGoal" value={goal} onChange={e => updateState({ goal: e.target.value as RewriteGoal })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" disabled={isLoading}>
-                        <option value="changePerspective">Thay đổi góc nhìn</option>
-                        <option value="changeGenre">Thay đổi thể loại</option>
-                        <option value="changeStyle">Thay đổi phong cách</option>
-                        <option value="summarize">Tóm tắt</option>
-                        <option value="expand">Mở rộng</option>
+            )}
+            {goal === 'changeGenre' && (
+                <div className="grid md:grid-cols-2 gap-4">
+                     <select value={targetGenre} onChange={e => updateState({ targetGenre: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
+                        {GENRE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
+                    {targetGenre === 'Tùy chỉnh...' && <input type="text" value={customTargetGenre} onChange={e => updateState({ customTargetGenre: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập thể loại tùy chỉnh" disabled={isLoading}/>}
                 </div>
-                
-                {goal === 'changePerspective' && (
-                    <div>
-                        <label htmlFor="perspectiveCharacter" className="block text-sm font-medium text-gray-700 mb-1">Nhân vật góc nhìn mới:</label>
-                        <input type="text" id="perspectiveCharacter" value={perspectiveCharacter} onChange={e => updateState({ perspectiveCharacter: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading} />
-                    </div>
-                )}
-                
-                {goal === 'changeGenre' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Thể loại mới:</label>
-                        <select value={targetGenre} onChange={e => updateState({ targetGenre: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
-                            {GENRE_OPTIONS.map(genre => <option key={genre} value={genre}>{genre}</option>)}
-                        </select>
-                        {targetGenre === 'Tùy chỉnh...' && <input type="text" value={customTargetGenre} onChange={e => updateState({ customTargetGenre: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập thể loại tùy chỉnh" disabled={isLoading}/>}
-                    </div>
-                )}
-                
-                {goal === 'changeStyle' && (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phong cách mới:</label>
-                        <select value={targetStyle} onChange={e => updateState({ targetStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
-                            {REWRITE_STYLE_OPTIONS.map(style => <option key={style.value} value={style.value}>{style.label}</option>)}
-                        </select>
-                        {targetStyle === 'custom' && <input type="text" value={customTargetStyle} onChange={e => updateState({ customTargetStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập phong cách tùy chỉnh" disabled={isLoading}/>}
-                    </div>
-                )}
-            </div>
-            
-            <div className="flex gap-2">
-                <button onClick={handleGeneratePlan} disabled={isLoading || !originalText.trim()} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
-                    Tạo Kế Hoạch
-                </button>
-                <button onClick={resetRestructure} disabled={isLoading} className="px-4 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 disabled:opacity-50">
-                    Reset
-                </button>
-            </div>
-            
-            {isLoading && <LoadingSpinner message={loadingMessage || 'Đang xử lý...'} />}
-            {error && <ErrorAlert message={error} />}
+            )}
+             {goal === 'changeStyle' && (
+                <div className="grid md:grid-cols-2 gap-4">
+                     <select value={targetStyle} onChange={e => updateState({ targetStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
+                        {REWRITE_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
+                    {targetStyle === 'custom' && <input type="text" value={customTargetStyle} onChange={e => updateState({ customTargetStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập phong cách tùy chỉnh" disabled={isLoading}/>}
+                </div>
+            )}
+
+            <button onClick={handleGeneratePlan} disabled={isLoading || !originalText.trim()} className="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:opacity-50">
+                Tạo Kế hoạch
+            </button>
         </div>
     );
 
+    // UI for Reviewing Step
     const renderReviewingStep = () => (
         <div className="space-y-6">
             <InfoBox>
-                <strong>Xem lại Kế Hoạch.</strong> Kiểm tra kế hoạch tái cấu trúc trước khi thực hiện.
+                <strong>Bước 2: Xem xét Kế hoạch.</strong> Đây là kế hoạch AI đề xuất để tái cấu trúc văn bản của bạn. Hãy xem lại và nhấn "Chấp thuận & Thực thi" để tiếp tục.
             </InfoBox>
-            
-            <div className="p-4 border rounded-lg bg-gray-50">
-                <h3 className="text-lg font-semibold mb-2">Kế Hoạch Tái Cấu Trúc:</h3>
-                <div className="whitespace-pre-wrap text-gray-700">{rewritePlan}</div>
+            <div>
+                 <h3 className="text-lg font-semibold text-gray-700 mb-2">Văn bản Gốc (để đối chiếu)</h3>
+                 <textarea value={originalText} readOnly rows={6} className="w-full p-2 border border-gray-200 bg-gray-100 rounded-md"/>
             </div>
-            
-            <div className="flex gap-2">
-                <button onClick={handleExecutePlan} disabled={isLoading} className="flex-1 bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
-                    Thực Hiện Kế Hoạch
+             <div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">Kế hoạch Tái cấu trúc của AI <Bot size={20} className="inline-block text-indigo-600"/></h3>
+                <textarea value={rewritePlan} readOnly rows={6} className="w-full p-3 border-2 border-indigo-300 bg-indigo-50 rounded-lg shadow-sm whitespace-pre-wrap"/>
+            </div>
+            <div className="flex gap-4">
+                <button onClick={() => updateState({step: 'planning'})} disabled={isLoading} className="w-1/3 bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-gray-600 disabled:opacity-50">
+                    Quay lại
                 </button>
-                <button onClick={() => updateState({ step: 'planning' })} disabled={isLoading} className="px-4 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 disabled:opacity-50">
-                    Chỉnh Sửa Kế Hoạch
+                <button onClick={handleExecutePlan} disabled={isLoading} className="w-2/3 bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 disabled:opacity-50">
+                    <Check className="inline-block mr-2" size={20}/>Chấp thuận & Thực thi
                 </button>
             </div>
-            
-            {isLoading && <LoadingSpinner message={loadingMessage || 'Đang xử lý...'} />}
-            {error && <ErrorAlert message={error} />}
         </div>
     );
-
+    
+    // UI for Completed Step
     const renderCompletedStep = () => (
-        <div className="space-y-6">
-            <InfoBox>
-                <strong>Hoàn Thành.</strong> Văn bản đã được tái cấu trúc theo kế hoạch.
+         <div className="space-y-6">
+             <InfoBox variant="info">
+                <strong>Hoàn thành!</strong> Dưới đây là kết quả văn bản đã được tái cấu trúc theo kế hoạch.
             </InfoBox>
-            
-            <div className="p-4 border rounded-lg bg-gray-50">
-                <h3 className="text-lg font-semibold mb-2">Văn Bản Đã Tái Cấu Trúc:</h3>
-                <textarea value={rewrittenText} readOnly rows={12} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"/>
-                <div className="mt-3">
-                    <button onClick={() => navigator.clipboard.writeText(rewrittenText)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-                        Sao Chép
-                    </button>
-                </div>
+            <div className="grid md:grid-cols-2 gap-6">
+                 <div>
+                     <h3 className="text-lg font-semibold text-gray-700 mb-2">Văn bản Gốc</h3>
+                     <textarea value={originalText} readOnly rows={15} className="w-full p-2 border border-gray-200 bg-gray-100 rounded-md"/>
+                 </div>
+                 <div>
+                     <h3 className="text-lg font-semibold text-green-700 mb-2">Văn bản Đã Tái cấu trúc</h3>
+                     <textarea value={rewrittenText} readOnly rows={15} className="w-full p-3 border-2 border-green-300 bg-green-50 rounded-lg"/>
+                 </div>
             </div>
-            
-            <div className="flex gap-2">
-                <button onClick={() => updateState({ step: 'planning' })} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90">
-                    Tái Cấu Trúc Văn Bản Khác
-                </button>
-                <button onClick={resetRestructure} className="px-4 py-3 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600">
-                    Reset Hoàn Toàn
-                </button>
-            </div>
+             <button onClick={resetRestructure} className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700">
+                <GitCompareArrows className="inline-block mr-2" size={20}/> Bắt đầu Tái cấu trúc mới
+            </button>
         </div>
     );
 
     return (
-        <div>
-            {step === 'planning' && renderPlanningStep()}
-            {step === 'reviewing' && renderReviewingStep()}
-            {step === 'completed' && renderCompletedStep()}
+        <div className="animate-fadeIn">
+            {isLoading && <LoadingSpinner message={loadingMessage || 'Đang xử lý...'} />}
+            {error && <ErrorAlert message={error} />}
+            {!isLoading && !error && (
+                <>
+                    {step === 'planning' && renderPlanningStep()}
+                    {step === 'reviewing' && renderReviewingStep()}
+                    {step === 'completed' && renderCompletedStep()}
+                </>
+            )}
         </div>
     );
 };
 
+
 // =================================================================================
 // Classic "Quick Rewrite" Tab Component
 // =================================================================================
-
 interface QuickRewriteTabProps {
     apiSettings: ApiSettings;
-    state: RewriteModuleState['quick'];
-    updateState: (updates: Partial<RewriteModuleState['quick']>) => void;
+    state: QuickRewriteState;
+    updateState: (updates: Partial<QuickRewriteState>) => void;
 }
 
 const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, updateState }) => {
@@ -438,7 +420,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         isEditing, editError, editLoadingMessage, hasBeenEdited, translation
     } = state;
 
-    const updateTranslationState = (updates: Partial<RewriteModuleState['quick']['translation']>) => {
+    const updateTranslationState = (updates: Partial<QuickRewriteState['translation']>) => {
         updateState({ translation: { ...translation, ...updates } });
     };
 
@@ -448,10 +430,11 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         } else {
             updateState({ adaptContext: false });
         }
-    }, [targetLanguage, sourceLanguage, updateState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [targetLanguage, sourceLanguage]);
 
     const handleSingleRewrite = async () => {
-        if (!originalText.trim()) {
+         if (!originalText.trim()) {
             updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
             return;
         }
@@ -546,7 +529,7 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
     };
 
     const handlePostRewriteEdit = async () => {
-        if (!rewrittenText.trim()) {
+         if (!rewrittenText.trim()) {
             updateState({ editError: 'Không có văn bản để tinh chỉnh.' });
             return;
         }
@@ -590,7 +573,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         } catch (e) {
             updateState({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
         } finally {
-            setTimeout(() => updateState({ editLoadingMessage: null }), 3000);
+             setTimeout(() => updateState({ editLoadingMessage: null }), 3000);
         }
     };
     
@@ -678,5 +661,6 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         </div>
     );
 };
+
 
 export default RewriteModule;
