@@ -480,6 +480,11 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         });
     }, [updateState]);
 
+    // Debug effect to track rewrittenText changes
+    useEffect(() => {
+        console.log('rewrittenText changed:', rewrittenText ? 'Has content' : 'Empty');
+    }, [rewrittenText]);
+
     const generateText = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
         const request = {
             prompt,
@@ -609,16 +614,21 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 console.log('generateText result:', result);
                 
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + result.text.trim();
+                console.log('Updating state with chunk result:', fullRewrittenText.substring(0, 100) + '...');
                 updateState({ rewrittenText: fullRewrittenText }); // Update UI progressively
             }
             
             console.log('Rewrite completed');
             console.log('Final rewritten text:', fullRewrittenText.trim());
+            
+            // Force state update with new object
+            const finalText = fullRewrittenText.trim();
             updateState({ 
-                rewrittenText: fullRewrittenText.trim(), 
-                loadingMessage: 'Hoàn thành!', 
-                progress: 100 
+                rewrittenText: finalText,
+                loadingMessage: 'Hoàn thành!',
+                progress: 100
             });
+            
             console.log('State updated with rewritten text');
         } catch (e) {
             console.error('Rewrite error:', e);
