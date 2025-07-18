@@ -132,6 +132,16 @@ const RestructureTab: React.FC<RestructureTabProps> = ({ apiSettings, state, upd
         isLoading, loadingMessage, error 
     } = state;
 
+    useEffect(() => {
+        // Reset loading and error states on mount
+        updateState({
+            isLoading: false,
+            loadingMessage: null,
+            error: null,
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const handleGeneratePlan = async () => {
         if (!originalText.trim()) {
             updateState({ error: 'Vui lòng nhập văn bản gốc.' });
@@ -416,13 +426,16 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
     };
 
     useEffect(() => {
-        if (targetLanguage !== sourceLanguage) {
-            updateState({ adaptContext: true }); 
-        } else {
-            updateState({ adaptContext: false });
-        }
+        // Reset loading and error states on mount
+        updateState({
+            loadingMessage: null,
+            error: null,
+            isEditing: false,
+            editError: null,
+            editLoadingMessage: null,
+        });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [targetLanguage, sourceLanguage]);
+    }, []);
 
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
