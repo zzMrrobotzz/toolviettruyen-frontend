@@ -248,7 +248,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                 {isProcessing && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
                 {error && <ErrorAlert message={error} />}
                 {editError && <ErrorAlert message={editError} />}
-                {rewrittenText && !anyLoading && (
+                {rewrittenText && !isProcessing && (
                      <div className="mt-6 p-4 border rounded-lg bg-gray-50">
                          <h3 className="text-lg font-semibold mb-2">Văn bản đã viết lại:</h3>
                          <textarea value={rewrittenText} readOnly rows={10} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"/>
