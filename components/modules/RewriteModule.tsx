@@ -133,7 +133,8 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         } catch (e) {
             updateState({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
         } finally {
-            setTimeout(() => updateState({ loadingMessage: null }), 3000);
+            // Không xóa loadingMessage bằng setTimeout nữa
+            updateState({ loadingMessage: null });
             setIsProcessing(false);
         }
     };
@@ -171,7 +172,8 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         } catch (e) {
             updateState({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
         } finally {
-             setTimeout(() => updateState({ editLoadingMessage: null }), 3000);
+             // Không xóa editLoadingMessage bằng setTimeout nữa
+             updateState({ editLoadingMessage: null });
              setIsProcessing(false);
         }
     };
