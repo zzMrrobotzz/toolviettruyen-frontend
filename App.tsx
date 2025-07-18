@@ -141,7 +141,6 @@ const App: React.FC = () => {
   const [writeStoryState, setWriteStoryState] = useState<WriteStoryModuleState>(initialWriteStoryState);
 
   const initialRewriteState: RewriteModuleState = {
-    activeTab: 'quick',
     quick: {
       rewriteLevel: 50,
       sourceLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
@@ -163,21 +162,6 @@ const App: React.FC = () => {
         isTranslating: false,
         error: null,
       },
-    },
-    restructure: {
-      step: 'planning',
-      originalText: '',
-      goal: 'changeStyle',
-      perspectiveCharacter: '',
-      targetGenre: 'Ngôn tình lãng mạn',
-      customTargetGenre: '',
-      targetStyle: REWRITE_STYLE_OPTIONS[0].value,
-      customTargetStyle: '',
-      rewritePlan: '',
-      rewrittenText: '',
-      isLoading: false,
-      loadingMessage: null,
-      error: null,
     },
   };
 
@@ -438,14 +422,7 @@ const App: React.FC = () => {
       delete stateToSave.quick.hasBeenEdited;
       delete stateToSave.quick.error;
     }
-    // Remove temporary states from restructure tab
-    if (stateToSave.restructure) {
-      delete stateToSave.restructure.rewritePlan;
-      delete stateToSave.restructure.rewrittenText;
-      delete stateToSave.restructure.isLoading;
-      delete stateToSave.restructure.loadingMessage;
-      delete stateToSave.restructure.error;
-    }
+
     localStorage.setItem('rewriteModuleState_v1', JSON.stringify(stateToSave));
   }, [rewriteState]);
 

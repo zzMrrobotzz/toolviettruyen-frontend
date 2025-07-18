@@ -3,10 +3,7 @@ import React, { useEffect } from 'react';
 import { 
     ApiSettings, 
     RewriteModuleState,
-    RewriteActiveTab,
-    RewriteGoal,
-    QuickRewriteState,
-    RestructureRewriteState
+    QuickRewriteState
 } from '../../types'; 
 import { HOOK_LANGUAGE_OPTIONS, REWRITE_STYLE_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
@@ -15,7 +12,7 @@ import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
 import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils';
-import { Languages, Text, Wand2, Bot, Check, GitCompareArrows } from 'lucide-react';
+import { Text, GitCompareArrows } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
 
 interface RewriteModuleProps {
@@ -24,34 +21,6 @@ interface RewriteModuleProps {
   setModuleState: React.Dispatch<React.SetStateAction<RewriteModuleState>>;
 }
 
-const GENRE_OPTIONS = [
-    'Ngôn tình lãng mạn', 'Hài hước', 'Kinh dị', 'Trinh thám', 'Khoa học viễn tưởng', 'Kỳ ảo (Fantasy)', 'Hành động', 'Lịch sử', 'Đời thường', 'Tùy chỉnh...'
-];
-
-const TabButton: React.FC<{
-  tabId: RewriteActiveTab;
-  activeTab: RewriteActiveTab;
-  label: string;
-  icon: React.ElementType;
-  onClick: (tabId: RewriteActiveTab) => void;
-  disabled: boolean;
-}> = ({ tabId, activeTab, label, icon: Icon, onClick, disabled }) => (
-    <button
-        onClick={() => onClick(tabId)}
-        disabled={disabled}
-        className={`flex items-center space-x-2 px-4 py-3 font-medium rounded-t-lg text-base transition-colors
-            ${activeTab === tabId 
-                ? 'bg-indigo-600 text-white shadow-md' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }
-            disabled:opacity-50 disabled:cursor-not-allowed
-        `}
-    >
-        <Icon size={18} />
-        <span>{label}</span>
-    </button>
-);
-
 const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {
     const { consumeCredit } = useAppContext();
 
@@ -59,368 +28,19 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         setModuleState(prev => ({ ...prev, quick: { ...prev.quick, ...updates } }));
     };
 
-    const updateRestructureState = (updates: Partial<RestructureRewriteState>) => {
-        setModuleState(prev => ({ ...prev, restructure: { ...prev.restructure, ...updates } }));
-    };
-    
-    // Khi chuyển tab sang quick, reset toàn bộ trạng thái liên quan (trừ originalText)
-    const handleTabChange = (tabId: RewriteActiveTab) => {
-        setModuleState(prev => ({
-            ...prev,
-            activeTab: tabId,
-            quick: {
-                ...prev.quick,
-                error: null,
-                loadingMessage: null,
-                editError: null,
-                editLoadingMessage: null,
-                progress: 0,
-                isEditing: false,
-                rewrittenText: '',
-                hasBeenEdited: false,
-                // giữ lại originalText
-            },
-            restructure: { ...prev.restructure, error: null, loadingMessage: null }
-        }));
-    };
-
-    // Chỉ khóa tab khi tab hiện tại đang xử lý
-    const isQuickTabLoading = moduleState.quick.loadingMessage !== null || moduleState.quick.isEditing;
-    const isRestructureTabLoading = moduleState.restructure.isLoading;
-    
-    // Tab bị khóa chỉ khi tab hiện tại đang xử lý
-    const isCurrentTabLoading = moduleState.activeTab === 'quick' ? isQuickTabLoading : isRestructureTabLoading;
-
     return (
         <ModuleContainer title="🔄 Viết Lại & Tái Cấu Trúc">
-             <div className="mb-6 flex flex-wrap gap-1 border-b-2 border-gray-300" role="tablist" aria-label="Chế độ viết lại">
-                <TabButton
-                    tabId="restructure"
-                    activeTab={moduleState.activeTab}
-                    label="Tái Cấu Trúc & Biến Hóa"
-                    icon={Wand2}
-                    onClick={handleTabChange}
-                    disabled={isCurrentTabLoading}
-                />
-                <TabButton
-                    tabId="quick"
-                    activeTab={moduleState.activeTab}
-                    label="Viết Lại Nhanh (Slider)"
-                    icon={Text}
-                    onClick={handleTabChange}
-                    disabled={isCurrentTabLoading}
-                />
-            </div>
-            
-            {moduleState.activeTab === 'restructure' && (
-                <RestructureTab
-                    apiSettings={apiSettings}
-                    state={moduleState.restructure}
-                    updateState={updateRestructureState}
-                />
-            )}
-
-            {moduleState.activeTab === 'quick' && (
-                <QuickRewriteTab
-                    apiSettings={apiSettings}
-                    state={moduleState.quick}
-                    updateState={updateQuickState}
-                />
-            )}
+            <QuickRewriteTab
+                apiSettings={apiSettings}
+                state={moduleState.quick}
+                updateState={updateQuickState}
+            />
         </ModuleContainer>
     );
 };
 
 // =================================================================================
-// Advanced "Restructure" Tab Component
-// =================================================================================
-
-interface RestructureTabProps {
-    apiSettings: ApiSettings;
-    state: RestructureRewriteState;
-    updateState: (updates: Partial<RestructureRewriteState>) => void;
-}
-
-const RestructureTab: React.FC<RestructureTabProps> = ({ apiSettings, state, updateState }) => {
-    const { consumeCredit } = useAppContext();
-    const { 
-        step, originalText, goal, perspectiveCharacter, targetGenre, customTargetGenre, 
-        targetStyle, customTargetStyle, rewritePlan, rewrittenText, 
-        isLoading, loadingMessage, error 
-    } = state;
-
-    const handleGeneratePlan = async () => {
-        if (!originalText.trim()) {
-            updateState({ error: 'Vui lòng nhập văn bản gốc.' });
-            return;
-        }
-        
-        const hasCredits = await consumeCredit(1);
-        if (!hasCredits) {
-            updateState({ error: 'Không đủ credit để thực hiện thao tác này.' });
-            return;
-        }
-        
-        updateState({ isLoading: true, error: null, loadingMessage: 'Đang tạo kế hoạch tái cấu trúc...' });
-        
-        let goalDescription = `Mục tiêu là ${goal}`;
-        let specificInstructions = '';
-        switch(goal) {
-            case 'changePerspective':
-                if (!perspectiveCharacter.trim()) {
-                    updateState({ error: 'Vui lòng nhập tên nhân vật cho góc nhìn mới.', isLoading: false, loadingMessage: null });
-                    return;
-                }
-                goalDescription = `Thay đổi góc nhìn sang nhân vật '${perspectiveCharacter}'`;
-                specificInstructions = `Tập trung vào suy nghĩ, cảm xúc và các sự kiện mà nhân vật '${perspectiveCharacter}' có thể biết.`;
-                break;
-            case 'changeGenre':
-                 let genre = targetGenre;
-                 if (genre === 'Tùy chỉnh...' && customTargetGenre.trim()) {
-                     genre = customTargetGenre.trim();
-                 } else if (genre === 'Tùy chỉnh...' && !customTargetGenre.trim()){
-                     updateState({ error: 'Vui lòng nhập thể loại tùy chỉnh.', isLoading: false, loadingMessage: null });
-                     return;
-                 }
-                 goalDescription = `Chuyển thể câu chuyện sang thể loại '${genre}'`;
-                 specificInstructions = `Áp dụng các yếu tố đặc trưng của thể loại '${genre}' như không khí, tình tiết, văn phong vào câu chuyện.`;
-                 break;
-            case 'changeStyle':
-                let style = REWRITE_STYLE_OPTIONS.find(o => o.value === targetStyle)?.label || targetStyle;
-                if(targetStyle === 'custom' && customTargetStyle.trim()){
-                    style = customTargetStyle.trim();
-                } else if (targetStyle === 'custom' && !customTargetStyle.trim()) {
-                     updateState({ error: 'Vui lòng nhập phong cách tùy chỉnh.', isLoading: false, loadingMessage: null });
-                    return;
-                }
-                goalDescription = `Viết lại theo phong cách '${style}'`;
-                specificInstructions = `Áp dụng văn phong '${style}' vào toàn bộ văn bản.`;
-                break;
-            case 'summarize':
-                 goalDescription = `Tóm tắt câu chuyện`;
-                 specificInstructions = `Cô đọng các tình tiết chính, giữ lại ý nghĩa cốt lõi.`;
-                 break;
-            case 'expand':
-                 goalDescription = `Mở rộng và làm chi tiết câu chuyện`;
-                 specificInstructions = `Thêm mô tả về không gian, nội tâm nhân vật, kéo dài hội thoại.`;
-                 break;
-        }
-
-        const prompt = `Bạn là một chuyên gia biên tập và lập kế hoạch truyện. Người dùng muốn tái cấu trúc một văn bản với mục tiêu cụ thể. Nhiệm vụ của bạn là tạo ra một kế hoạch rõ ràng, từng bước mà bạn sẽ tuân theo để đạt được mục tiêu này. Kế hoạch phải ngắn gọn, bằng Tiếng Việt, dễ hiểu để người dùng phê duyệt.
-
-**Văn bản gốc:**
----
-${originalText}
----
-
-**Mục tiêu của người dùng:** ${goalDescription}
-
-**Hướng dẫn cụ thể cho mục tiêu:**
-${specificInstructions}
-
-**Nhiệm vụ của bạn:**
-Tạo một kế hoạch viết lại bằng Tiếng Việt. Kế hoạch phải nêu rõ những thay đổi chính bạn sẽ thực hiện.
-Ví dụ, nếu mục tiêu là thay đổi góc nhìn, kế hoạch có thể là:
-1. Phân tích các sự kiện chính từ góc nhìn của nhân vật gốc.
-2. Xác định các sự kiện mà nhân vật '${perspectiveCharacter}' có thể chứng kiến hoặc biết đến.
-3. Viết lại câu chuyện từ góc nhìn của '${perspectiveCharacter}', tập trung vào suy nghĩ và cảm xúc của họ.
-4. Điều chỉnh văn phong để phù hợp với tính cách của '${perspectiveCharacter}'.
-
-Chỉ trả về kế hoạch được đánh số. Không thêm bất kỳ văn bản nào khác.`;
-        
-        try {
-            const result = await generateTextViaBackend({ prompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
-                // Update credit if needed
-            });
-            
-            if (!result.success) {
-                throw new Error(result.error || 'AI generation failed');
-            }
-            
-            updateState({ rewritePlan: result.text, step: 'reviewing', isLoading: false, loadingMessage: null });
-        } catch (e) {
-            updateState({ error: `Lỗi khi tạo kế hoạch: ${(e as Error).message}`, isLoading: false, loadingMessage: null });
-        }
-    };
-    
-    const handleExecutePlan = async () => {
-        const hasCredits = await consumeCredit(1);
-        if (!hasCredits) {
-            updateState({ error: 'Không đủ credit để thực hiện thao tác này.' });
-            return;
-        }
-        
-        updateState({ isLoading: true, error: null, loadingMessage: 'Đang thực thi kế hoạch và viết lại...' });
-        
-        const prompt = `Bạn là một nhà văn chuyên nghiệp. Bạn đã tạo ra một kế hoạch viết lại và người dùng đã phê duyệt nó. Bây giờ, bạn phải thực hiện kế hoạch đó một cách hoàn hảo.
-
-**Văn bản gốc:**
----
-${originalText}
----
-
-**Kế hoạch viết lại đã được phê duyệt:**
----
-${rewritePlan}
----
-
-**Nhiệm vụ của bạn:**
-Viết lại "Văn bản gốc" bằng cách tuân thủ chính xác "Kế hoạch viết lại đã được phê duyệt".
-Đầu ra cuối cùng phải là câu chuyện hoàn chỉnh, đã được viết lại, bằng Tiếng Việt.
-Chỉ trả về câu chuyện đã viết lại. Không bao gồm kế hoạch, văn bản gốc, hoặc bất kỳ giải thích nào khác.`;
-
-        try {
-            const result = await generateTextViaBackend({ prompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
-                // Update credit if needed
-            });
-            
-            if (!result.success) {
-                throw new Error(result.error || 'AI generation failed');
-            }
-            
-            updateState({ rewrittenText: result.text, step: 'completed', isLoading: false, loadingMessage: null });
-        } catch (e) {
-             updateState({ error: `Lỗi khi thực thi kế hoạch: ${(e as Error).message}`, isLoading: false, loadingMessage: null });
-        }
-    };
-
-    const resetRestructure = () => {
-        updateState({
-            step: 'planning',
-            originalText: '',
-            rewritePlan: '',
-            rewrittenText: '',
-            error: null,
-            isLoading: false,
-            loadingMessage: null
-        });
-    };
-    
-    // UI for Planning Step
-    const renderPlanningStep = () => (
-        <div className="space-y-6">
-            <InfoBox>
-                <strong>Bước 1: Lập Kế hoạch.</strong> Cung cấp văn bản gốc và chọn mục tiêu tái cấu trúc. AI sẽ tạo một kế hoạch để bạn xem xét trước khi thực hiện.
-            </InfoBox>
-            <div>
-                <label htmlFor="restructureOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
-                <textarea 
-                    id="restructureOriginalText" 
-                    value={originalText} 
-                    onChange={e => updateState({ originalText: e.target.value })} 
-                    rows={10} 
-                    className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm"
-                    placeholder="Dán văn bản cần tái cấu trúc vào đây..."
-                    disabled={isLoading}
-                />
-            </div>
-            
-             <div>
-                <label htmlFor="rewriteGoal" className="block text-sm font-medium text-gray-700 mb-1">Mục tiêu Tái cấu trúc:</label>
-                <select id="rewriteGoal" value={goal} onChange={e => updateState({ goal: e.target.value as RewriteGoal })} className="w-full p-3 border-2 border-gray-300 rounded-lg shadow-sm" disabled={isLoading}>
-                    <option value="changeStyle">Thay đổi Văn phong</option>
-                    <option value="changePerspective">Thay đổi Góc nhìn</option>
-                    <option value="summarize">Rút gọn & Tóm tắt</option>
-                    <option value="expand">Mở rộng & Làm chi tiết</option>
-                    <option value="changeGenre">Chuyển Thể loại</option>
-                </select>
-            </div>
-            
-            {/* Conditional Inputs */}
-            {goal === 'changePerspective' && (
-                <div>
-                    <label htmlFor="perspectiveCharacter" className="block text-sm font-medium text-gray-700 mb-1">Tên nhân vật (cho góc nhìn mới):</label>
-                    <input type="text" id="perspectiveCharacter" value={perspectiveCharacter} onChange={e => updateState({ perspectiveCharacter: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading} />
-                </div>
-            )}
-            {goal === 'changeGenre' && (
-                <div className="grid md:grid-cols-2 gap-4">
-                     <select value={targetGenre} onChange={e => updateState({ targetGenre: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
-                        {GENRE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                    {targetGenre === 'Tùy chỉnh...' && <input type="text" value={customTargetGenre} onChange={e => updateState({ customTargetGenre: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập thể loại tùy chỉnh" disabled={isLoading}/>}
-                </div>
-            )}
-             {goal === 'changeStyle' && (
-                <div className="grid md:grid-cols-2 gap-4">
-                     <select value={targetStyle} onChange={e => updateState({ targetStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" disabled={isLoading}>
-                        {REWRITE_STYLE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                    </select>
-                    {targetStyle === 'custom' && <input type="text" value={customTargetStyle} onChange={e => updateState({ customTargetStyle: e.target.value })} className="w-full p-2 border border-gray-300 rounded-md" placeholder="Nhập phong cách tùy chỉnh" disabled={isLoading}/>}
-                </div>
-            )}
-
-            <button onClick={handleGeneratePlan} disabled={isLoading || !originalText.trim()} className="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 disabled:opacity-50">
-                Tạo Kế hoạch
-            </button>
-        </div>
-    );
-
-    // UI for Reviewing Step
-    const renderReviewingStep = () => (
-        <div className="space-y-6">
-            <InfoBox>
-                <strong>Bước 2: Xem xét Kế hoạch.</strong> Đây là kế hoạch AI đề xuất để tái cấu trúc văn bản của bạn. Hãy xem lại và nhấn "Chấp thuận & Thực thi" để tiếp tục.
-            </InfoBox>
-            <div>
-                 <h3 className="text-lg font-semibold text-gray-700 mb-2">Văn bản Gốc (để đối chiếu)</h3>
-                 <textarea value={originalText} readOnly rows={6} className="w-full p-2 border border-gray-200 bg-gray-100 rounded-md"/>
-            </div>
-             <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Kế hoạch Tái cấu trúc của AI <Bot size={20} className="inline-block text-indigo-600"/></h3>
-                <textarea value={rewritePlan} readOnly rows={6} className="w-full p-3 border-2 border-indigo-300 bg-indigo-50 rounded-lg shadow-sm whitespace-pre-wrap"/>
-            </div>
-            <div className="flex gap-4">
-                <button onClick={() => updateState({step: 'planning'})} disabled={isLoading} className="w-1/3 bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-gray-600 disabled:opacity-50">
-                    Quay lại
-                </button>
-                <button onClick={handleExecutePlan} disabled={isLoading} className="w-2/3 bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 disabled:opacity-50">
-                    <Check className="inline-block mr-2" size={20}/>Chấp thuận & Thực thi
-                </button>
-            </div>
-        </div>
-    );
-    
-    // UI for Completed Step
-    const renderCompletedStep = () => (
-         <div className="space-y-6">
-             <InfoBox variant="info">
-                <strong>Hoàn thành!</strong> Dưới đây là kết quả văn bản đã được tái cấu trúc theo kế hoạch.
-            </InfoBox>
-            <div className="grid md:grid-cols-2 gap-6">
-                 <div>
-                     <h3 className="text-lg font-semibold text-gray-700 mb-2">Văn bản Gốc</h3>
-                     <textarea value={originalText} readOnly rows={15} className="w-full p-2 border border-gray-200 bg-gray-100 rounded-md"/>
-                 </div>
-                 <div>
-                     <h3 className="text-lg font-semibold text-green-700 mb-2">Văn bản Đã Tái cấu trúc</h3>
-                     <textarea value={rewrittenText} readOnly rows={15} className="w-full p-3 border-2 border-green-300 bg-green-50 rounded-lg"/>
-                 </div>
-            </div>
-             <button onClick={resetRestructure} className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700">
-                <GitCompareArrows className="inline-block mr-2" size={20}/> Bắt đầu Tái cấu trúc mới
-            </button>
-        </div>
-    );
-
-    return (
-        <div className="animate-fadeIn">
-            {isLoading && <LoadingSpinner message={loadingMessage || 'Đang xử lý...'} />}
-            {error && <ErrorAlert message={error} />}
-            {!isLoading && !error && (
-                <>
-                    {step === 'planning' && renderPlanningStep()}
-                    {step === 'reviewing' && renderReviewingStep()}
-                    {step === 'completed' && renderCompletedStep()}
-                </>
-            )}
-        </div>
-    );
-};
-
-
-// =================================================================================
-// Classic "Quick Rewrite" Tab Component
+// Quick Rewrite Tab Component
 // =================================================================================
 interface QuickRewriteTabProps {
     apiSettings: ApiSettings;
@@ -463,7 +83,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         }
     }, [targetLanguage, sourceLanguage]);
 
-    // Logic tương tự như RestructureTab - chỉ xử lý khi click button
+    // Logic xử lý - chỉ khi click button
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
             updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
@@ -729,6 +349,5 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         </div>
     );
 };
-
 
 export default RewriteModule;

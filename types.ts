@@ -232,10 +232,6 @@ export interface WriteStoryModuleState {
 }
 
 // Rewrite Module with advanced features
-export type RewriteActiveTab = 'quick' | 'restructure';
-
-export type RewriteGoal = 'changeStyle' | 'changePerspective' | 'summarize' | 'expand' | 'changeGenre';
-
 export interface QuickRewriteState {
   rewriteLevel: number;
   sourceLanguage: string;
@@ -259,31 +255,9 @@ export interface QuickRewriteState {
   };
 }
 
-export interface RestructureRewriteState {
-  step: 'planning' | 'reviewing' | 'completed';
-  originalText: string;
-  goal: RewriteGoal;
-  perspectiveCharacter: string;
-  targetGenre: string;
-  customTargetGenre: string;
-  targetStyle: string;
-  customTargetStyle: string;
-  rewritePlan: string;
-  rewrittenText: string;
-  isLoading: boolean;
-  loadingMessage: string | null;
-  error: string | null;
-}
-
 export interface RewriteModuleState {
-  // Tab control
-  activeTab: RewriteActiveTab;
-  
   // Quick rewrite tab state
   quick: QuickRewriteState;
-  
-  // Restructure tab state
-  restructure: RestructureRewriteState;
 }
 
 
