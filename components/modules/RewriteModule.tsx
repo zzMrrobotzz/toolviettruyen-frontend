@@ -610,8 +610,14 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 
                 console.log('Calling generateText...');
                 await delay(500); // Simulate API call delay
-                const result = await generateText(prompt, undefined, false, apiSettings);
+                const result = await generateTextViaBackend({ prompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
+                    // Update credit if needed
+                });
                 console.log('generateText result:', result);
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'AI generation failed');
+                }
                 
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + result.text.trim();
                 console.log('Updating state with chunk result:', fullRewrittenText.substring(0, 100) + '...');
@@ -673,7 +679,14 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
 `;
         
         try {
-            const result = await generateText(editPrompt, undefined, false, apiSettings);
+            const result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
+                // Update credit if needed
+            });
+            
+            if (!result.success) {
+                throw new Error(result.error || 'AI generation failed');
+            }
+            
             updateState({ rewrittenText: result.text, isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true });
         } catch (e) {
             updateState({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
