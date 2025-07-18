@@ -1,16 +1,16 @@
 
 import React, { useEffect } from 'react';
-import { 
-    ApiSettings, 
+import {
+    ApiSettings,
     RewriteModuleState,
     QuickRewriteState
-} from '../../types'; 
+} from '../../types';
 import { HOOK_LANGUAGE_OPTIONS, REWRITE_STYLE_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextViaBackend } from '../../services/aiProxyService';
+import { generateAiContent } from '../../src/services/keyService';
 import { delay } from '../../utils';
 import { Text, GitCompareArrows } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
@@ -49,7 +49,7 @@ interface QuickRewriteTabProps {
 }
 
 const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, updateState }) => {
-    const { consumeCredit } = useAppContext();
+    const { keyInfo, setKeyInfo, consumeCredit } = useAppContext();
     
     const {
         rewriteLevel, sourceLanguage, targetLanguage, rewriteStyle, customRewriteStyle, adaptContext,
@@ -114,7 +114,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
                     0: 'only fix spelling and grammar. Keep the original story 100%.',
                     25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning and plot.',
                     50: 'moderately rewrite the wording and style. You can change sentence structures and vocabulary, but MUST keep the main character names and core plot points.',
-                    75: 'creatively reimagine the story. You can change character names and some settings. The plot may have new developments, but it MUST retain the spirit of the original script.',
+                    75: ' creatively reimagine the story. You can change character names and some settings. The plot may have new developments, but it MUST retain the spirit of the original script.',
                     100: 'completely rewrite into a new script. Only retain the "soul" (core idea, main theme) of the original story.'
                 };
                 const descriptionKey = Math.round(rewriteLevel / 25) * 25;
@@ -135,49 +135,24 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
                     rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${effectiveStyle}.`;
                 }
 
-                const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.
-
-**Instructions:**
-- **Source Language:** ${selectedSourceLangLabel}
-- **Target Language:** ${selectedTargetLangLabel}
-- **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.
-- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}
-- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
-- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.
-${localizationRequest}
-
-**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**
----
-${fullRewrittenText || "This is the first chunk."}
----
-
-**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**
----
-${textChunk}
----
-
-**Your Task:**
-Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
-`;
+                const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.\n\n**Instructions:**\n- **Source Language:** ${selectedSourceLangLabel}\n- **Target Language:** ${selectedTargetLangLabel}\n- **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.\n- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}\n- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.\n- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.\n${localizationRequest}\n\n**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**\n---\n${fullRewrittenText || "This is the first chunk."}\n---\n\n**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**\n---\n${textChunk}\n---\n\n**Your Task:**\nProvide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.\n`;
                 
                 await delay(500); // Simulate API call delay
-                const result = await generateTextViaBackend({ prompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
-                    // Update credit if needed
-                });
+                const result = await generateAiContent(prompt, apiSettings?.provider || 'gemini', keyInfo.key);
                 
-                if (!result.success) {
-                    throw new Error(result.error || 'AI generation failed');
+                if (result.remainingCredits !== undefined) {
+                    setKeyInfo({ ...keyInfo, credit: result.remainingCredits });
                 }
                 
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + result.text.trim();
-                console.log('Updating rewrittenText:', { 
-                    chunkIndex: i + 1, 
+                console.log('Updating rewrittenText:', {
+                    chunkIndex: i + 1,
                     fullLength: fullRewrittenText.length,
                     chunkText: result.text.trim().substring(0, 100) + '...'
                 });
                 updateState({ rewrittenText: fullRewrittenText }); // Update UI progressively
             }
-            console.log('Final rewrittenText:', { 
+            console.log('Final rewrittenText:', {
                 finalLength: fullRewrittenText.trim().length,
                 finalText: fullRewrittenText.trim().substring(0, 200) + '...'
             });
@@ -203,31 +178,13 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         
         updateState({ isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false });
         
-        const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.
-
-**Text to Edit:**
----
-${rewrittenText}
----
-
-**Editing Instructions:**
-1.  **Consistency:** Ensure character names, locations, and plot points are consistent throughout the text. Correct any contradictions.
-2.  **Flow and Cohesion:** Improve the flow between sentences and paragraphs. Ensure smooth transitions.
-3.  **Clarity and Conciseness:** Remove repetitive phrases and redundant words. Clarify any confusing sentences.
-4.  **Grammar and Spelling:** Correct any grammatical errors or typos.
-5.  **Timestamp Check (Final):** Double-check and ensure absolutely NO timestamps (e.g., (11:42)) remain in the final text. The output must be a clean narrative.
-
-**Output:**
-Return ONLY the fully edited and polished text. Do not add any commentary or explanations.
-`;
+        const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.\n\n**Text to Edit:**\n---\n${rewrittenText}\n---\n\n**Editing Instructions:**\n1.  **Consistency:** Ensure character names, locations, and plot points are consistent throughout the text. Correct any contradictions.\n2.  **Flow and Cohesion:** Improve the flow between sentences and paragraphs. Ensure smooth transitions.\n3.  **Clarity and Conciseness:** Remove repetitive phrases and redundant words. Clarify any confusing sentences.\n4.  **Grammar and Spelling:** Correct any grammatical errors or typos.\n5.  **Timestamp Check (Final):** Double-check and ensure absolutely NO timestamps (e.g., (11:42)) remain in the final text. The output must be a clean narrative.\n\n**Output:**\nReturn ONLY the fully edited and polished text. Do not add any commentary or explanations.\n`;
         
         try {
-            const result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {
-                // Update credit if needed
-            });
-            
-            if (!result.success) {
-                throw new Error(result.error || 'AI generation failed');
+            const result = await generateAiContent(editPrompt, apiSettings?.provider || 'gemini', keyInfo.key);
+
+            if (result.remainingCredits !== undefined) {
+                setKeyInfo({ ...keyInfo, credit: result.remainingCredits });
             }
             
             updateState({ rewrittenText: result.text, isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true });
