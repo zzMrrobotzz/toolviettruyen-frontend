@@ -424,6 +424,18 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         updateState({ translation: { ...translation, ...updates } });
     };
 
+    // Reset loading states on mount to prevent auto-processing
+    useEffect(() => {
+        updateState({ 
+            loadingMessage: null, 
+            progress: 0, 
+            error: null, 
+            isEditing: false, 
+            editError: null, 
+            editLoadingMessage: null 
+        });
+    }, []);
+
     useEffect(() => {
         if (targetLanguage !== sourceLanguage) {
             updateState({ adaptContext: true }); 
