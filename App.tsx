@@ -177,6 +177,11 @@ const App: React.FC = () => {
     }
     return initialRewriteState;
   });
+
+  // Thêm useEffect để lưu lại rewriteState vào localStorage mỗi khi thay đổi
+  useEffect(() => {
+    localStorage.setItem('rewriteModuleState_v1', JSON.stringify(rewriteState));
+  }, [rewriteState]);
   
   const [analysisState, setAnalysisState] = useState<AnalysisModuleState>({
     sourceText: '', analysisFactors: [], suggestions: '', improvedStory: '', viralOutlineAnalysisResult: '',
@@ -647,19 +652,16 @@ const App: React.FC = () => {
                 />;
       case ActiveModule.Analysis:
         return <AnalysisModule 
-                  apiSettings={apiSettings}
                   moduleState={analysisState}
                   setModuleState={setAnalysisState}
                 />;
        case ActiveModule.NicheThemeExplorer:
         return <NicheThemeExplorerModule 
-                  apiSettings={apiSettings}
                   moduleState={nicheThemeExplorerState}
                   setModuleState={setNicheThemeExplorerState}
                 />;
        case ActiveModule.Dream100CompetitorAnalysis:
         return <Dream100CompetitorAnalysisModule
-                  apiSettings={apiSettings}
                   moduleState={dream100State}
                   setModuleState={setDream100State}
                 />;
