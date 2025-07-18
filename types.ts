@@ -231,27 +231,59 @@ export interface WriteStoryModuleState {
   };
 }
 
-// Rewrite Module - Batch functionality REMOVED
-export interface RewriteModuleState {
-  // Common settings
+// Rewrite Module with advanced features
+export type RewriteActiveTab = 'quick' | 'restructure';
+
+export type RewriteGoal = 'changeStyle' | 'changePerspective' | 'summarize' | 'expand' | 'changeGenre';
+
+export interface QuickRewriteState {
   rewriteLevel: number;
   sourceLanguage: string;
   targetLanguage: string;
   rewriteStyle: string;
-  customRewriteStyle: string; // Used for 'custom' style
+  customRewriteStyle: string;
   adaptContext: boolean;
+  originalText: string;
+  rewrittenText: string;
+  error: string | null;
+  progress: number;
+  loadingMessage: string | null;
+  isEditing: boolean;
+  editError: string | null;
+  editLoadingMessage: string | null;
+  hasBeenEdited: boolean;
+  translation: {
+    translatedText: string | null;
+    isTranslating: boolean;
+    error: string | null;
+  };
+}
 
-  // Single Rewrite 
-  singleOriginalText: string;
-  singleRewrittenText: string;
-  singleError: string | null;
-  singleProgress: number; // For chunk progress in single mode
-  singleLoadingMessage: string | null; // For main rewrite process
-  // Post-rewrite editing state for single rewrite
-  isEditingSingleRewrite: boolean;
-  singleRewriteEditError: string | null;
-  singleRewriteEditLoadingMessage: string | null;
-  hasSingleRewriteBeenEdited: boolean;
+export interface RestructureRewriteState {
+  step: 'planning' | 'reviewing' | 'completed';
+  originalText: string;
+  goal: RewriteGoal;
+  perspectiveCharacter: string;
+  targetGenre: string;
+  customTargetGenre: string;
+  targetStyle: string;
+  customTargetStyle: string;
+  rewritePlan: string;
+  rewrittenText: string;
+  isLoading: boolean;
+  loadingMessage: string | null;
+  error: string | null;
+}
+
+export interface RewriteModuleState {
+  // Tab control
+  activeTab: RewriteActiveTab;
+  
+  // Quick rewrite tab state
+  quick: QuickRewriteState;
+  
+  // Restructure tab state
+  restructure: RestructureRewriteState;
 }
 
 
@@ -730,16 +762,19 @@ interface BatchRewriteModuleProps {
 }
 
 interface AnalysisModuleProps {
+    apiSettings: ApiSettings;
     moduleState: AnalysisModuleState;
     setModuleState: React.Dispatch<React.SetStateAction<AnalysisModuleState>>;
 }
 
 interface NicheThemeExplorerModuleProps {
+    apiSettings: ApiSettings;
     moduleState: NicheThemeExplorerModuleState;
     setModuleState: React.Dispatch<React.SetStateAction<NicheThemeExplorerModuleState>>;
 }
 
 interface Dream100CompetitorAnalysisModuleProps {
+    apiSettings: ApiSettings;
     moduleState: Dream100CompetitorAnalysisModuleState;
     setModuleState: React.Dispatch<React.SetStateAction<Dream100CompetitorAnalysisModuleState>>;
 }

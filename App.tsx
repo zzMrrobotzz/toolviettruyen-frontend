@@ -131,26 +131,54 @@ const App: React.FC = () => {
     generatedLesson: '',
     lessonError: null,
     lessonLoadingMessage: null,
+    storyTranslation: {
+      translatedText: null,
+      isTranslating: false,
+      error: null,
+    },
   };
 
   const [writeStoryState, setWriteStoryState] = useState<WriteStoryModuleState>(initialWriteStoryState);
 
   const initialRewriteState: RewriteModuleState = {
-    rewriteLevel: 50,
-    sourceLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
-    targetLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
-    rewriteStyle: REWRITE_STYLE_OPTIONS[0].value,
-    customRewriteStyle: '',
-    adaptContext: false,
-    singleOriginalText: '',
-    singleRewrittenText: '',
-    singleError: null,
-    singleProgress: 0,
-    singleLoadingMessage: null,
-    isEditingSingleRewrite: false,
-    singleRewriteEditError: null,
-    singleRewriteEditLoadingMessage: null,
-    hasSingleRewriteBeenEdited: false,
+    activeTab: 'quick',
+    quick: {
+      rewriteLevel: 50,
+      sourceLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
+      targetLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
+      rewriteStyle: REWRITE_STYLE_OPTIONS[0].value,
+      customRewriteStyle: '',
+      adaptContext: false,
+      originalText: '',
+      rewrittenText: '',
+      error: null,
+      progress: 0,
+      loadingMessage: null,
+      isEditing: false,
+      editError: null,
+      editLoadingMessage: null,
+      hasBeenEdited: false,
+      translation: {
+        translatedText: null,
+        isTranslating: false,
+        error: null,
+      },
+    },
+    restructure: {
+      step: 'planning',
+      originalText: '',
+      goal: 'changeStyle',
+      perspectiveCharacter: '',
+      targetGenre: 'Ngôn tình lãng mạn',
+      customTargetGenre: '',
+      targetStyle: REWRITE_STYLE_OPTIONS[0].value,
+      customTargetStyle: '',
+      rewritePlan: '',
+      rewrittenText: '',
+      isLoading: false,
+      loadingMessage: null,
+      error: null,
+    },
   };
 
   const [rewriteState, setRewriteState] = useState<RewriteModuleState>(initialRewriteState);
@@ -161,10 +189,12 @@ const App: React.FC = () => {
   });
 
   const [ttsState, setTtsState] = useState<TtsModuleState>({
-    selectedTtsApiKey: '',
-    availableVoices: [],
-    selectedTtsVoiceId: '',
+    selectedApiKey: '',
+    voices: [],
+    selectedVoiceId: '',
     textToSpeak: '',
+    generatedAudioChunks: [],
+    totalCharsLeft: '',
     error: null,
     loadingMessage: null,
   });
@@ -386,13 +416,25 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const stateToSave: Partial<RewriteModuleState> = { ...rewriteState };
-    delete stateToSave.singleRewrittenText;
-    delete stateToSave.singleLoadingMessage;
-    delete stateToSave.singleProgress;
-    delete stateToSave.isEditingSingleRewrite;
-    delete stateToSave.singleRewriteEditError;
-    delete stateToSave.singleRewriteEditLoadingMessage;
-    delete stateToSave.hasSingleRewriteBeenEdited;
+    // Remove temporary states from quick tab
+    if (stateToSave.quick) {
+      delete stateToSave.quick.rewrittenText;
+      delete stateToSave.quick.loadingMessage;
+      delete stateToSave.quick.progress;
+      delete stateToSave.quick.isEditing;
+      delete stateToSave.quick.editError;
+      delete stateToSave.quick.editLoadingMessage;
+      delete stateToSave.quick.hasBeenEdited;
+      delete stateToSave.quick.error;
+    }
+    // Remove temporary states from restructure tab
+    if (stateToSave.restructure) {
+      delete stateToSave.restructure.rewritePlan;
+      delete stateToSave.restructure.rewrittenText;
+      delete stateToSave.restructure.isLoading;
+      delete stateToSave.restructure.loadingMessage;
+      delete stateToSave.restructure.error;
+    }
     localStorage.setItem('rewriteModuleState_v1', JSON.stringify(stateToSave));
   }, [rewriteState]);
 
