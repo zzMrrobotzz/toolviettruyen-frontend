@@ -465,20 +465,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetLanguage, sourceLanguage]);
 
-    // Reset loading states when component mounts to prevent stuck loading state
-    useEffect(() => {
-        if (loadingMessage !== null || isEditing) {
-            updateState({ 
-                loadingMessage: null, 
-                isEditing: false, 
-                editLoadingMessage: null,
-                progress: 0,
-                error: null,
-                editError: null
-            });
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+
 
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
@@ -671,9 +658,27 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                  <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
                  <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateState({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={anyLoading}></textarea>
             </div>
-             <button onClick={handleSingleRewrite} disabled={anyLoading || !originalText.trim()} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
-                 Viết lại Văn bản
-             </button>
+             <div className="flex gap-2">
+                 <button onClick={handleSingleRewrite} disabled={anyLoading || !originalText.trim()} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
+                     Viết lại Văn bản
+                 </button>
+                 {anyLoading && (
+                     <button 
+                         onClick={() => updateState({ 
+                             loadingMessage: null, 
+                             isEditing: false, 
+                             editLoadingMessage: null,
+                             progress: 0,
+                             error: null,
+                             editError: null
+                         })} 
+                         className="px-4 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600"
+                         title="Reset trạng thái nếu bị treo"
+                     >
+                         Reset
+                     </button>
+                 )}
+             </div>
              {anyLoading && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
              {error && <ErrorAlert message={error} />}
              {editError && <ErrorAlert message={editError} />}
