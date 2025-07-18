@@ -1,6 +1,6 @@
 
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { 
     ApiSettings, 
     RewriteModuleState
@@ -43,15 +43,19 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetLanguage, sourceLanguage]);
 
+    const [isProcessing, setIsProcessing] = React.useState(false);
+
     const handleSingleRewrite = async () => {
          if (!originalText.trim()) {
             updateState({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
             return;
         }
+        setIsProcessing(true);
         // Trừ credit trước khi xử lý
         const hasCredits = await consumeCredit(1);
         if (!hasCredits) {
             updateState({ error: 'Không đủ credit để thực hiện thao tác này!' });
+            setIsProcessing(false);
             return;
         }
         updateState({ error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false });
@@ -130,6 +134,7 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             updateState({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
         } finally {
             setTimeout(() => updateState({ loadingMessage: null }), 3000);
+            setIsProcessing(false);
         }
     };
 
@@ -138,6 +143,7 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             updateState({ editError: 'Không có văn bản để tinh chỉnh.' });
             return;
         }
+        setIsProcessing(true);
         updateState({ isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false });
         
         const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.
@@ -166,6 +172,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
             updateState({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
         } finally {
              setTimeout(() => updateState({ editLoadingMessage: null }), 3000);
+             setIsProcessing(false);
         }
     };
     
@@ -238,7 +245,7 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
                  <button onClick={handleSingleRewrite} disabled={anyLoading || !originalText.trim()} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
                     Viết lại Văn bản
                 </button>
-                {anyLoading && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
+                {isProcessing && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
                 {error && <ErrorAlert message={error} />}
                 {editError && <ErrorAlert message={editError} />}
                 {rewrittenText && !anyLoading && (
