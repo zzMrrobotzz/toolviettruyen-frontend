@@ -24,14 +24,16 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
     // Lấy state từ moduleState.quick
     const {
         rewriteLevel, sourceLanguage, targetLanguage, rewriteStyle, customRewriteStyle, adaptContext,
-        originalText, rewrittenText, error, progress, loadingMessage,
+        originalText, error, progress, loadingMessage,
         isEditing, editError, editLoadingMessage, hasBeenEdited, translation
     } = moduleState.quick;
 
+    // State riêng cho kết quả
+    const [rewrittenText, setRewrittenText] = React.useState('');
+
     // Helper: updateStateInput chỉ update các trường input, không động vào rewrittenText
     const updateStateInput = (updates: Partial<Omit<typeof moduleState.quick, 'rewrittenText'>>) => {
-        const { rewrittenText, ...rest } = updates as any;
-        setModuleState(prev => ({ ...prev, quick: { ...prev.quick, ...rest } }));
+        setModuleState(prev => ({ ...prev, quick: { ...prev.quick, ...updates } }));
     };
 
     const { consumeCredit } = useAppContext();
@@ -61,7 +63,8 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
             return;
         }
         // Chỉ xóa rewrittenText ở đây
-        setModuleState(prev => ({ ...prev, quick: { ...prev.quick, error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false } }));
+        setRewrittenText('');
+        updateStateInput({ error: null, progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false });
         
         const CHUNK_CHAR_COUNT = 4000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
@@ -130,9 +133,10 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 const result = await generateTextViaBackend(request, (newCredit) => {});
                 if (!result.success) throw new Error(result.error || 'AI generation failed');
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + (result.text || '').trim();
-                setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: fullRewrittenText } })); // Update UI progressively
+                setRewrittenText(fullRewrittenText); // Update UI progressively
             }
-            setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: fullRewrittenText.trim(), loadingMessage: 'Hoàn thành!', progress: 100 } }));
+            setRewrittenText(fullRewrittenText.trim());
+            updateStateInput({ loadingMessage: 'Hoàn thành!', progress: 100 });
         } catch (e) {
             updateStateInput({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
         } finally {
@@ -171,7 +175,8 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         try {
             const result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
             if (!result.success) throw new Error(result.error || 'AI generation failed');
-            setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: result.text || '', isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true } }));
+            setRewrittenText(result.text || '');
+            updateStateInput({ isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true });
         } catch (e) {
             updateStateInput({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
         } finally {
