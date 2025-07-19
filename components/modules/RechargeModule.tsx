@@ -43,7 +43,11 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
     }
     setPaying(true);
     try {
+      console.log('Creating payment for:', { key: currentKey, credit: creditAmount });
+      console.log('API URL:', `${API_BASE_URL}/payment/create`);
+      
       const res = await axios.post(`${API_BASE_URL}/payment/create`, { key: currentKey, credit: creditAmount });
+      console.log('Payment response:', res.data);
       if (res.data?.success && res.data?.transferInfo) {
         const { transferInfo, qrData, payUrl } = res.data;
         setModal({
@@ -87,8 +91,11 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       }
     } catch (err) {
       const error: any = err;
-      let detail = error?.response?.data?.message || error?.message || 'Lỗi tạo đơn thanh toán!';
-      setModal({ open: true, title: 'Lỗi nạp credit', content: detail });
+      console.error('Payment creation error:', error);
+      console.error('Error response:', error?.response?.data);
+      
+      let detail = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Lỗi tạo đơn thanh toán!';
+      setModal({ open: true, title: 'Lỗi nạp credit', content: `Chi tiết lỗi: ${detail}` });
       await new Promise(r => setTimeout(r, 2000));
     }
     setPaying(false);
