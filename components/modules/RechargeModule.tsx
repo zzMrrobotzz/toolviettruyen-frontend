@@ -4,25 +4,39 @@ import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 import QRCodeWrapper from './QRCodeWrapper';
 
-const PRICING = [
-  { label: '100 bài viết', credit: 100, price: 500000 },
-  { label: '220 bài viết', credit: 220, price: 1000000 },
-  { label: '800 bài viết', credit: 800, price: 3000000 },
-];
+interface CreditPackage {
+  _id: string;
+  name: string;
+  price: number;
+  credits: number;
+  bonus?: string;
+  isPopular?: boolean;
+  isActive?: boolean;
+}
 
 const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
   const [credit, setCredit] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [packages, setPackages] = useState<CreditPackage[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(false);
   // State cho Modal custom
   const [modal, setModal] = useState<{ open: boolean, title: string, content: React.ReactNode, onOk?: () => void }>({ open: false, title: '', content: '', onOk: undefined });
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('RechargeModule received currentKey:', currentKey);
-    console.log('currentKey type:', typeof currentKey);
-    console.log('currentKey length:', currentKey?.length);
-  }, [currentKey]);
+  // Lấy danh sách gói credit từ backend
+  const fetchPackages = async () => {
+    setPackagesLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/packages`);
+      // Chỉ hiển thị gói đang active
+      const activePackages = res.data.filter((pkg: CreditPackage) => pkg.isActive !== false);
+      setPackages(activePackages);
+    } catch (err) {
+      console.error('Failed to fetch packages:', err);
+      setModal({ open: true, title: 'Lỗi', content: 'Không lấy được danh sách gói credit!' });
+    }
+    setPackagesLoading(false);
+  };
 
   // Lấy số credit hiện tại
   const fetchCredit = async () => {
@@ -39,6 +53,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
 
   React.useEffect(() => {
     fetchCredit();
+    fetchPackages();
     // eslint-disable-next-line
   }, [currentKey]);
 
@@ -147,28 +162,66 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
           <b>Số credit còn lại:</b> {loading ? <Spin size="small" /> : <span style={{ color: '#52c41a' }}>{credit ?? '...'}</span>}
         </Typography.Paragraph>
         <Button onClick={fetchCredit} style={{ marginBottom: 24 }}>Kiểm tra credit</Button>
-        <Row gutter={16}>
-          {PRICING.map((pkg, idx) => (
-            <Col span={8} key={idx}>
-              <Card
-                style={{ marginBottom: 16, textAlign: 'center', opacity: paying ? 0.7 : 1 }}
-                bordered
-                title={pkg.label}
-              >
-                <div style={{ fontSize: 18, marginBottom: 8 }}><b>{(pkg.price || 0).toLocaleString()} VNĐ</b></div>
-                <Button
-                  type="primary"
-                  loading={paying}
-                  disabled={paying}
-                  onClick={() => handleRecharge(pkg.credit)}
-                  style={{ width: '100%' }}
+        
+        {packagesLoading ? (
+          <div style={{ textAlign: 'center', margin: '40px 0' }}>
+            <Spin size="large" />
+            <div style={{ marginTop: 8 }}>Đang tải gói credit...</div>
+          </div>
+        ) : packages.length === 0 ? (
+          <div style={{ textAlign: 'center', margin: '40px 0', color: '#666' }}>
+            Hiện tại không có gói credit nào khả dụng.
+          </div>
+        ) : (
+          <Row gutter={16}>
+            {packages.map((pkg) => (
+              <Col span={8} key={pkg._id}>
+                <Card
+                  style={{ 
+                    marginBottom: 16, 
+                    textAlign: 'center', 
+                    opacity: paying ? 0.7 : 1,
+                    border: pkg.isPopular ? '2px solid #1890ff' : undefined
+                  }}
+                  bordered
+                  title={
+                    <div>
+                      {pkg.name}
+                      {pkg.isPopular && (
+                        <span style={{ 
+                          background: '#1890ff', 
+                          color: 'white', 
+                          fontSize: '12px', 
+                          padding: '2px 8px', 
+                          borderRadius: '12px', 
+                          marginLeft: '8px' 
+                        }}>
+                          Phổ biến
+                        </span>
+                      )}
+                    </div>
+                  }
                 >
-                  {paying ? 'Đang xử lý...' : 'Nạp gói này'}
-                </Button>
-              </Card>
-            </Col>
-          ))}
-        </Row>
+                  <div style={{ fontSize: 18, marginBottom: 8 }}>
+                    <b>{pkg.price.toLocaleString()} VNĐ</b>
+                  </div>
+                  <div style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
+                    {pkg.credits} credit{pkg.bonus && ` + ${pkg.bonus}`}
+                  </div>
+                  <Button
+                    type="primary"
+                    loading={paying}
+                    disabled={paying}
+                    onClick={() => handleRecharge(pkg.credits)}
+                    style={{ width: '100%' }}
+                  >
+                    {paying ? 'Đang xử lý...' : 'Nạp gói này'}
+                  </Button>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        )}
         {paying && (
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <Spin size="large" />
