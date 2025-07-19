@@ -17,6 +17,13 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
   // State cho Modal custom
   const [modal, setModal] = useState<{ open: boolean, title: string, content: React.ReactNode, onOk?: () => void }>({ open: false, title: '', content: '', onOk: undefined });
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log('RechargeModule received currentKey:', currentKey);
+    console.log('currentKey type:', typeof currentKey);
+    console.log('currentKey length:', currentKey?.length);
+  }, [currentKey]);
+
   // Lấy số credit hiện tại
   const fetchCredit = async () => {
     if (!currentKey) return;
@@ -37,8 +44,25 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
 
   // Nạp credit
   const handleRecharge = async (creditAmount: number) => {
-    if (!currentKey) {
-      setModal({ open: true, title: 'Lỗi nạp credit', content: 'Không tìm thấy key hiện tại!' });
+    console.log('handleRecharge called with:', { creditAmount, currentKey });
+    
+    if (!currentKey || currentKey.trim() === '') {
+      console.error('No currentKey available:', { currentKey, length: currentKey?.length });
+      setModal({ 
+        open: true, 
+        title: 'Lỗi nạp credit', 
+        content: (
+          <div>
+            <p>Không tìm thấy key hiện tại!</p>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+              Debug: currentKey = "{currentKey}" (length: {currentKey?.length || 0})
+            </p>
+            <p style={{ fontSize: '12px', color: '#666' }}>
+              Vui lòng đăng nhập lại để sử dụng tính năng này.
+            </p>
+          </div>
+        )
+      });
       return;
     }
     setPaying(true);
