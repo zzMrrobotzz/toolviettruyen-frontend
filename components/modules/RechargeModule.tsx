@@ -44,28 +44,45 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
     setPaying(true);
     try {
       const res = await axios.post(`${API_BASE_URL}/payment/create`, { key: currentKey, credit: creditAmount });
-      if (res.data?.payUrl) {
+      if (res.data?.success && res.data?.transferInfo) {
+        const { transferInfo, qrData, payUrl } = res.data;
         setModal({
           open: true,
-          title: 'Quét QR để thanh toán',
+          title: 'Thông tin thanh toán',
           content: (
-            <div style={{ textAlign: 'center' }}>
-              <QRCodeWrapper value={res.data.payUrl} size={200} />
-              <div style={{ marginTop: 16 }}>
-                <Button type="primary" onClick={() => window.open(res.data.payUrl, '_blank')}>
+            <div>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <QRCodeWrapper value={qrData || payUrl} size={200} />
+              </div>
+              
+              <div style={{ backgroundColor: '#f5f5f5', padding: 16, borderRadius: 8, marginBottom: 16 }}>
+                <h4 style={{ margin: '0 0 8px 0' }}>Thông tin chuyển khoản:</h4>
+                <div><b>Ngân hàng:</b> {transferInfo.bankName}</div>
+                <div><b>Số tài khoản:</b> {transferInfo.accountNumber}</div>
+                <div><b>Tên người nhận:</b> {transferInfo.accountName}</div>
+                <div><b>Số tiền:</b> <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{transferInfo.amount.toLocaleString()} VND</span></div>
+                <div><b>Nội dung CK:</b> <span style={{ color: '#1890ff', fontWeight: 'bold' }}>{transferInfo.content}</span></div>
+              </div>
+
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <Button type="primary" onClick={() => window.open(payUrl, '_blank')}>
                   Mở trang thanh toán
                 </Button>
               </div>
-              <div style={{ marginTop: 16 }}>
-                <b>Hướng dẫn:</b> Quét QR bằng app ngân hàng để thanh toán. Sau khi thanh toán xong, bấm <b>"Kiểm tra credit"</b> để cập nhật.<br />
-                Nếu có vấn đề, liên hệ admin để được hỗ trợ.
+              
+              <div style={{ fontSize: '13px', color: '#666' }}>
+                <b>Hướng dẫn:</b><br />
+                1. Quét QR hoặc chuyển khoản theo thông tin trên<br />
+                2. <b>BẮT BUỘC</b> ghi đúng nội dung chuyển khoản<br />
+                3. Sau khi chuyển khoản, bấm <b>"Kiểm tra credit"</b> để cập nhật<br />
+                4. Nếu có vấn đề, liên hệ admin để được hỗ trợ
               </div>
             </div>
           ),
           onOk: undefined
         });
       } else {
-        setModal({ open: true, title: 'Lỗi nạp credit', content: 'Không lấy được link thanh toán!' });
+        setModal({ open: true, title: 'Lỗi nạp credit', content: res.data?.error || 'Không tạo được đơn thanh toán!' });
         await new Promise(r => setTimeout(r, 2000));
       }
     } catch (err) {
