@@ -9,7 +9,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/aiProxyService';
+import { generateText } from '../../services/geminiService';
 
 interface CharacterStudioModuleProps {
   apiSettings: ApiSettings;
@@ -143,7 +143,7 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
     }
     
     try {
-      const result = await generateText(userPrompt, systemInstruction, undefined, apiSettings);
+      const result = await generateText(userPrompt, systemInstruction, false, apiSettings?.apiKey);
       if (isRefinement) {
           updateState({ 
               generatedBaseCharacterPrompt: result.text.trim(), 
@@ -224,7 +224,7 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
 `;
 
     try {
-              const result = await generateText(userPrompt, systemInstruction, undefined, apiSettings);
+              const result = await generateText(userPrompt, systemInstruction, false, apiSettings?.apiKey);
       updateState({ 
           generatedCompleteImagePrompt: result.text.trim(), 
           isLoadingCompletePrompt: false, 

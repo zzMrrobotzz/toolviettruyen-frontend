@@ -9,7 +9,8 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateImageViaBackend, generateTextViaBackend } from '../../services/aiProxyService';
+import { generateImage, generateText } from '../../services/geminiService';
+import { generateImageViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
 
@@ -106,17 +107,8 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     The number of prompts in the array should reflect the visual storytelling potential of the input. Aim for 2-7 prompts.
     `;
 
-    const result = await generateTextViaBackend({
-      prompt: subPromptsGenerationPrompt,
-      provider: 'gemini',
-      systemInstruction: 'You are an AI assistant that analyzes text and generates multiple detailed image prompts in English, formatted as a JSON array.',
-    });
-
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to generate sub-prompts');
-    }
-
     try {
+      const result = await generateText(subPromptsGenerationPrompt, 'You are an AI assistant that analyzes text and generates multiple detailed image prompts in English, formatted as a JSON array.', false, apiSettings?.apiKey);
       const jsonResponse = JSON.parse(result.text || '{}');
       if (!jsonResponse.image_prompts || !Array.isArray(jsonResponse.image_prompts)) {
         throw new Error('Invalid response format');

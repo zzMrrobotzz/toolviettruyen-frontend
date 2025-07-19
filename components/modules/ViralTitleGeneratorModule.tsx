@@ -7,7 +7,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextViaBackend } from '../../services/aiProxyService';
+import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
 
 interface ContentStrategyModuleProps {
   apiSettings: ApiSettings;
@@ -110,7 +110,7 @@ ${creationViralContext.trim()}
       }
 
       if (prompt) {
-        const result = await generateText(prompt, undefined, false, apiSettings);
+        const result = await generateText(prompt, undefined, false, apiSettings?.apiKey);
         let mainResultText = result.text;
         let explanationText = null;
 
@@ -202,7 +202,7 @@ Gợi ý 2: ...
 `;
 
     try {
-        const result = await generateText(prompt, undefined, analyzeInputType === 'urls', apiSettings);
+        const result = await generateText(prompt, undefined, analyzeInputType === 'urls', apiSettings?.apiKey);
         const text = result.text;
         const groundingChunks = result.groundingChunks || [];
 
@@ -277,7 +277,7 @@ Ensure the output is ONLY the JSON array. Do not include any introductory text, 
     `;
 
     try {
-      const resultsArray = await generateTextWithJsonOutput<NicheThemeAnalysisResult[]>(prompt, undefined, apiSettings);
+      const resultsArray = await generateTextWithJsonOutput<NicheThemeAnalysisResult[]>(prompt, undefined, apiSettings?.apiKey);
       if (Array.isArray(resultsArray)) {
         updateState({ 
             nicheAnalysisResults: resultsArray, 

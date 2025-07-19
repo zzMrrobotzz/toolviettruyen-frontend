@@ -9,7 +9,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextViaBackend } from '../../services/aiProxyService';
+import { generateTextWithJsonOutput } from '../../services/geminiService';
 import { useAppContext } from '../../AppContext';
 
 interface NicheThemeExplorerModuleProps {
@@ -31,26 +31,7 @@ const NicheThemeExplorerModule: React.FC<NicheThemeExplorerModuleProps> = ({
   };
 
   const generateJsonViaBackend = async <T,>(prompt: string): Promise<T> => {
-    const result = await generateTextViaBackend({
-      prompt,
-      provider: 'gemini',
-      systemInstruction: 'You are a helpful assistant that returns valid JSON.',
-    });
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to generate content');
-    }
-    
-    try {
-      return JSON.parse(result.text) as T;
-    } catch (e) {
-      // If parsing fails, try to extract JSON from the response
-      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]) as T;
-      }
-      throw new Error('Invalid JSON response from backend');
-    }
+    return await generateTextWithJsonOutput<T>(prompt, 'You are a helpful assistant that returns valid JSON.', apiSettings?.apiKey);
   };
 
   const handleAnalyzeAndExploreNiches = async () => {

@@ -15,7 +15,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextViaBackend } from '../../services/aiProxyService';
+import { generateText } from '../../services/geminiService';
 import { delay } from '../../utils';
 
 interface EditStoryModuleProps {
@@ -57,37 +57,13 @@ const EditStoryModule: React.FC<EditStoryModuleProps> = ({ apiSettings, moduleSt
     setModuleState(prev => ({ ...prev, ...updates }));
   };
   
-  const generateText = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
-    const request = {
-      prompt,
-      provider: apiSettings?.provider || 'gemini'
-    };
-
-    const result = await generateTextViaBackend(request, (newCredit) => {
-      // Update credit if needed
-    });
-
-    if (!result.success) {
-      throw new Error(result.error || 'AI generation failed');
-    }
-
-    return { text: result.text || '' };
+  const generateTextLocal = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
+    return await generateText(prompt, systemInstruction, false, apiSettings?.apiKey);
   };
 
-  const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings): Promise<T> => {
-    const request = {
-      prompt,
-      provider: apiSettings?.provider || 'gemini'
-    };
-
-    const result = await generateTextViaBackend(request, (newCredit) => {
-      // Update credit if needed
-    });
-
-    if (!result.success) {
-      throw new Error(result.error || 'AI generation failed');
-    }
-
+  const generateTextWithJsonOutputLocal = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings): Promise<T> => {
+    const result = await generateText(prompt, systemInstruction, false, apiSettings?.apiKey);
+    
     // Try to parse as JSON
     try {
       return JSON.parse(result.text || '{}');
@@ -165,7 +141,7 @@ const EditStoryModule: React.FC<EditStoryModuleProps> = ({ apiSettings, moduleSt
     - Không thêm lời bình, giới thiệu, hay tiêu đề.`;
         
     await delay(isBatchItem ? 500 : 1000); // Shorter delay for batch items if needed
-    const editResult = await generateText(editPrompt, undefined, undefined, apiSettings);
+    const editResult = await generateTextLocal(editPrompt, undefined, undefined, apiSettings);
     const newlyEditedStory = editResult.text;
     if (!newlyEditedStory.trim()) {
         throw new Error("Không thể tạo nội dung truyện đã biên tập.");
@@ -274,7 +250,7 @@ CHỈ TRẢ VỀ JSON.`;
     Trả về TOÀN BỘ câu chuyện đã được tinh chỉnh lại bằng ngôn ngữ ${outputLanguageLabel}. Không thêm lời bình hay giới thiệu.`;
 
     try {
-              const result = await generateText(prompt, undefined, undefined, apiSettings);
+              const result = await generateTextLocal(prompt, undefined, undefined, apiSettings);
       updateState({ editedStoryOutput: result.text, isRefiningFurther: false, postEditAnalysis: null, refinementInstruction: '' }); // Clear instruction after use, optionally clear analysis
     } catch (e) {
       updateState({ furtherRefinementError: `Lỗi khi tinh chỉnh thêm: ${(e as Error).message}`, isRefiningFurther: false });

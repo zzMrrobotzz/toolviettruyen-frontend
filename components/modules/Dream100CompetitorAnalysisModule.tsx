@@ -10,7 +10,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextViaBackend } from '../../services/aiProxyService';
+import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
 import { useAppContext } from '../../AppContext';
 
 interface Dream100CompetitorAnalysisModuleProps {
@@ -106,24 +106,9 @@ If you cannot find enough distinct similar channels, return as many as you can u
     `;
 
     try {
-      const result = await generateTextViaBackend({
-        prompt, 
-        provider: 'gemini',
-        useGrounding: true, // Enable Google Search
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || 'AI generation failed');
-      }
-
-      let jsonStr = result.text.trim();
-      const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-      const match = jsonStr.match(fenceRegex);
-      if (match && match[2]) {
-        jsonStr = match[2].trim();
-      }
-
-      const parsedResults = JSON.parse(jsonStr) as Dream100ChannelResult[];
+      const result = await generateText(prompt, undefined, true, apiSettings?.apiKey); // Enable Google Search
+      const parsedResults = await generateTextWithJsonOutput<Dream100ChannelResult[]>(prompt, undefined, apiSettings?.apiKey);
+      
       updateState({
         analysisResults: parsedResults,
         isLoading: false,
