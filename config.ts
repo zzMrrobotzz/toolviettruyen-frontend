@@ -1,5 +1,5 @@
 // API Configuration with wrapper support
-const USE_PAYMENT_WRAPPER = true; // Set to true to use payment wrapper
+const USE_PAYMENT_WRAPPER = false; // Set to false to use fixed backend
 
 const ORIGINAL_BACKEND = "https://key-manager-backend.onrender.com/api";
 const PAYMENT_WRAPPER_URL = "https://your-wrapper-url.railway.app"; // Update this after deployment
