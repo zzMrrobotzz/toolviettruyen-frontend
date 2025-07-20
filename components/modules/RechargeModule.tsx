@@ -28,9 +28,16 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
     setPackagesLoading(true);
     try {
       const res = await axios.get(`${API_BASE_URL}/packages`);
-      // Chỉ hiển thị gói đang active
-      const activePackages = res.data.filter((pkg: CreditPackage) => pkg.isActive !== false);
-      setPackages(activePackages);
+      console.log('Packages response:', res.data);
+      
+      if (res.data.success && res.data.packages) {
+        // Chỉ hiển thị gói đang active
+        const activePackages = res.data.packages.filter((pkg: CreditPackage) => pkg.isActive !== false);
+        setPackages(activePackages);
+        console.log('Active packages loaded:', activePackages.length);
+      } else {
+        setModal({ open: true, title: 'Lỗi', content: 'Định dạng dữ liệu gói credit không đúng!' });
+      }
     } catch (err) {
       console.error('Failed to fetch packages:', err);
       setModal({ open: true, title: 'Lỗi', content: 'Không lấy được danh sách gói credit!' });
@@ -108,17 +115,34 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
               </div>
 
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <Button type="primary" onClick={() => window.open(payUrl, '_blank')}>
-                  Mở trang thanh toán
+                <Button 
+                  type="primary" 
+                  size="large"
+                  onClick={() => window.open(payUrl, '_blank')}
+                  style={{ marginRight: 8 }}
+                >
+                  🔗 Thanh toán PayOS
+                </Button>
+                <Button 
+                  type="default"
+                  onClick={() => {
+                    // Auto-check payment status after opening PayOS
+                    setTimeout(() => {
+                      fetchCredit();
+                    }, 5000);
+                  }}
+                >
+                  ⏰ Kiểm tra tự động
                 </Button>
               </div>
               
               <div style={{ fontSize: '13px', color: '#666' }}>
-                <b>Hướng dẫn:</b><br />
-                1. Quét QR hoặc chuyển khoản theo thông tin trên<br />
-                2. <b>BẮT BUỘC</b> ghi đúng nội dung chuyển khoản<br />
-                3. Sau khi chuyển khoản, bấm <b>"Kiểm tra credit"</b> để cập nhật<br />
-                4. Nếu có vấn đề, liên hệ admin để được hỗ trợ
+                <b>Hướng dẫn thanh toán:</b><br />
+                🎯 <b>Tự động (PayOS):</b> Bấm "Thanh toán PayOS" → Chọn ngân hàng → Thanh toán → Credit tự động cộng<br />
+                📱 <b>QR Code:</b> Quét mã QR bằng app ngân hàng → Thanh toán<br />
+                🏦 <b>Chuyển khoản:</b> Chuyển theo thông tin trên + <b>GHI ĐÚNG nội dung</b><br />
+                ⏰ Sau thanh toán: Credit sẽ tự động cập nhật trong vài phút<br />
+                🆘 Cần hỗ trợ: Liên hệ admin nếu có vấn đề
               </div>
             </div>
           ),
@@ -230,10 +254,18 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
             </div>
           </div>
         )}
-        <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>
-          Sau khi thanh toán, vui lòng bấm <b>"Kiểm tra credit"</b> để cập nhật số credit mới.<br />
-          Nếu có vấn đề, liên hệ admin để được hỗ trợ.
-        </Typography.Paragraph>
+        <div style={{ marginTop: 16, padding: 16, background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae6fd' }}>
+          <Typography.Text strong style={{ color: '#0369a1' }}>
+            💳 Thanh toán với PayOS - Nhanh chóng & An toàn
+          </Typography.Text>
+          <br />
+          <Typography.Text type="secondary" style={{ fontSize: '13px' }}>
+            ✅ Hỗ trợ tất cả ngân hàng Việt Nam<br />
+            ✅ Credit tự động cộng sau thanh toán<br />
+            ✅ QR Code tương thích mọi app ngân hàng<br />
+            ✅ Bảo mật SSL 256-bit encryption
+          </Typography.Text>
+        </div>
       </Card>
     </div>
   );
