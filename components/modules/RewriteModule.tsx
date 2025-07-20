@@ -106,6 +106,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
 - **Source Language:** ${selectedSourceLangLabel}
 - **Target Language:** ${selectedTargetLangLabel}
 - **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.
+- **Output Length Requirement (CRITICAL):** Your rewritten output MUST be at least as long as the original text, preferably 10-20% longer. Maintain the same level of detail, narrative richness, and descriptive elements. Do NOT shorten or summarize the content.
 - **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}
 - **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
 - **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.
@@ -122,7 +123,7 @@ ${textChunk}
 ---
 
 **Your Task:**
-Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Do not include any other text, introductions, or explanations.
+Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Ensure the output is comprehensive and at least as detailed as the original. Do not include any other text, introductions, or explanations.
 `;
                 
                 await delay(500); // Simulate API call delay

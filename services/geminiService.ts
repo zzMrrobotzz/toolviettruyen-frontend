@@ -46,7 +46,7 @@ export const generateText = async (
       contents: { role: 'user', parts: contents },
       config: {
         generationConfig: {
-          maxOutputTokens: 16384,
+          maxOutputTokens: 32768,
           temperature: 0.7,
           topP: 0.8,
           topK: 40
@@ -105,7 +105,7 @@ export const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstr
       config: {
         responseMimeType: "application/json",
         generationConfig: {
-          maxOutputTokens: 16384,
+          maxOutputTokens: 32768,
           temperature: 0.7,
           topP: 0.8,
           topK: 40
@@ -200,7 +200,7 @@ export const generateTextFromImageAndText = async (
       contents: { role: 'user', parts: [imagePart, textPart] },
       config: {
         generationConfig: {
-          maxOutputTokens: 16384,
+          maxOutputTokens: 32768,
           temperature: 0.7,
           topP: 0.8,
           topK: 40
