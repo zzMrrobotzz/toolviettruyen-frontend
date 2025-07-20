@@ -139,6 +139,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       console.log('Trying different payload formats...');
       let res;
       const payloads = [
+        { key: currentKey, creditAmount: creditAmount },
         { key: currentKey, packageId: pkg._id, amount: pkg.price, credits: pkg.credits },
         { key: currentKey, amount: creditAmount },
         { key: currentKey, credit: creditAmount },
