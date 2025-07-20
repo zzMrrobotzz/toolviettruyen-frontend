@@ -23,6 +23,37 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
   // State cho Modal custom
   const [modal, setModal] = useState<{ open: boolean, title: string, content: React.ReactNode, onOk?: () => void }>({ open: false, title: '', content: '', onOk: undefined });
 
+  // 3 gói mặc định khi backend không có dữ liệu
+  const defaultPackages: CreditPackage[] = [
+    {
+      _id: 'default-1',
+      name: 'Gói Cơ Bản',
+      price: 500000,
+      credits: 100,
+      bonus: '🔥 Khuyến mại',
+      isPopular: false,
+      isActive: true
+    },
+    {
+      _id: 'default-2', 
+      name: 'Gói Phổ Biến',
+      price: 1000000,
+      credits: 220,
+      bonus: '💎 Tiết kiệm 10%',
+      isPopular: true,
+      isActive: true
+    },
+    {
+      _id: 'default-3',
+      name: 'Gói Premium',
+      price: 3000000, 
+      credits: 800,
+      bonus: '🌟 Tiết kiệm 33%',
+      isPopular: false,
+      isActive: true
+    }
+  ];
+
   // Lấy danh sách gói credit từ backend
   const fetchPackages = async () => {
     setPackagesLoading(true);
@@ -30,17 +61,20 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       const res = await axios.get(`${API_BASE_URL}/packages`);
       console.log('Packages response:', res.data);
       
-      if (res.data.success && res.data.packages) {
-        // Chỉ hiển thị gói đang active
+      if (res.data.success && res.data.packages && res.data.packages.length > 0) {
+        // Chỉ hiển thị gói đang active từ backend
         const activePackages = res.data.packages.filter((pkg: CreditPackage) => pkg.isActive !== false);
         setPackages(activePackages);
-        console.log('Active packages loaded:', activePackages.length);
+        console.log('Active packages loaded from backend:', activePackages.length);
       } else {
-        setModal({ open: true, title: 'Lỗi', content: 'Định dạng dữ liệu gói credit không đúng!' });
+        // Fallback: Sử dụng gói mặc định khi backend không có dữ liệu
+        console.log('Backend không có gói nào, sử dụng gói mặc định');
+        setPackages(defaultPackages);
       }
     } catch (err) {
-      console.error('Failed to fetch packages:', err);
-      setModal({ open: true, title: 'Lỗi', content: 'Không lấy được danh sách gói credit!' });
+      console.error('Failed to fetch packages from backend, using default packages:', err);
+      // Fallback: Sử dụng gói mặc định khi có lỗi
+      setPackages(defaultPackages);
     }
     setPackagesLoading(false);
   };
@@ -63,6 +97,13 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
     fetchPackages();
     // eslint-disable-next-line
   }, [currentKey]);
+
+  // Khởi tạo gói mặc định nếu chưa có gói nào
+  React.useEffect(() => {
+    if (packages.length === 0 && !packagesLoading) {
+      setPackages(defaultPackages);
+    }
+  }, []);
 
   // Nạp credit
   const handleRecharge = async (creditAmount: number) => {
