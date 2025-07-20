@@ -247,6 +247,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     currentTargetLanguage: string,
     currentRewriteStyle: string, // The actual style string (e.g., label or custom text)
     currentAdaptContext: boolean,
+    characterMapUsed: string | null, // Character map from rewrite process
     itemId: string, // For progress updates
     onProgress: (itemId: string, status: GeneratedBatchRewriteOutputItem['status'], message: string | null) => void,
     textGenerator: (prompt: string, systemInstruction?: string) => Promise<string>
@@ -256,45 +257,43 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     const selectedSourceLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentSourceLanguage)?.label || currentSourceLanguage;
     const selectedTargetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentTargetLanguage)?.label || currentTargetLanguage;
 
-    const editPrompt = `Bạn là một biên tập viên truyện chuyên nghiệp, cực kỳ tỉ mỉ và có khả năng tinh chỉnh văn phong xuất sắc. Nhiệm vụ của bạn là đọc kỹ "Văn Bản Đã Viết Lại" dưới đây. Mục tiêu chính của bạn là BIÊN TẬP và TINH CHỈNH văn bản này để nó trở nên mạch lạc, logic, nhất quán, và ĐẶC BIỆT là loại bỏ mọi sự trùng lặp, thừa thãi, đồng thời cải thiện văn phong cho súc tích và hấp dẫn hơn. Bạn sẽ SO SÁNH, ĐỐI CHIẾU "Văn Bản Đã Viết Lại" với "Văn Bản Gốc Ban Đầu" CHỦ YẾU để đảm bảo các yếu tố cốt lõi (nhân vật, tình tiết chính) được giữ lại một cách hợp lý theo "Mức Độ Thay Đổi Yêu Cầu" của lần viết lại trước, chứ KHÔNG phải để đưa văn bản trở lại y hệt bản gốc.
+    const editPrompt = `You are a meticulous story editor with an eidetic memory. Your task is to find and fix every single consistency error in the "Văn Bản Đã Viết Lại". You will cross-reference it against the "Văn Bản Gốc Ban Đầu" and the "Character Map" to ensure perfect logical and narrative integrity.
 
-    **QUAN TRỌNG: Văn bản "Đã Viết Lại" có thể đã được thay đổi ở một mức độ nhất định so với "Văn Bản Gốc" (dựa trên Mức Độ Thay Đổi Yêu Cầu). Việc biên tập của bạn KHÔNG PHẢI là đưa nó trở lại giống hệt bản gốc, mà là đảm bảo BÊN TRONG chính "Văn Bản Đã Viết Lại" đó phải nhất quán và logic, đồng thời vẫn tôn trọng những thay đổi có chủ đích đã được thực hiện (nếu có) so với bản gốc trong phạm vi cho phép của mức độ viết lại.**
+**CONTEXT FOR EDITING:**
+- Rewrite Level Previously Applied: ${currentRewriteLevel}%
+- Character Map Generated During Rewrite: \`${characterMapUsed || 'Không có'}\`
+- Source Language: ${selectedSourceLangLabel}
+- Target Language: ${selectedTargetLangLabel}
+- Rewrite Style Applied: ${currentRewriteStyle}
+- Cultural Localization Applied: ${currentAdaptContext ? 'Yes' : 'No'}
 
-    **THÔNG TIN CHO BỐI CẢNH BIÊN TẬP:**
-    - Ngôn ngữ Văn Bản Gốc: ${selectedSourceLangLabel}
-    - Ngôn ngữ Văn Bản Đã Viết Lại (và ngôn ngữ đầu ra của bạn): ${selectedTargetLangLabel}
-    - Mức Độ Thay Đổi Yêu Cầu (của lần viết lại trước): ${currentRewriteLevel}%
-    - Phong Cách Viết Lại Yêu Cầu (của lần viết lại trước): ${currentRewriteStyle}
-    - Có yêu cầu bản địa hóa khi viết lại: ${currentAdaptContext ? 'Có' : 'Không'}
+**VĂN BẢN GỐC BAN ĐẦU (để đối chiếu logic và các yếu tố gốc):**
+---
+${originalSourceTextToCompare}
+---
 
-    **VĂN BẢN GỐC BAN ĐẦU (để đối chiếu logic và các yếu tố gốc):**
-    ---
-    ${originalSourceTextToCompare}
-    ---
+**VĂN BẢN ĐÃ VIẾT LẠI (Cần bạn biên tập và tinh chỉnh):**
+---
+${textToEdit}
+---
 
-    **VĂN BẢN ĐÃ VIẾT LẠI (Cần bạn biên tập và tinh chỉnh):**
-    ---
-    ${textToEdit}
-    ---
+**HƯỚNG DẪN BIÊN TẬP NGHIÊM NGẶT:**
+1.  **NHẤT QUÁN TÊN NHÂN VẬT (QUAN TRỌNG NHẤT):**
+    - Rà soát kỹ TOÀN BỘ "Văn Bản Đã Viết Lại". Đảm bảo MỖI nhân vật chỉ sử dụng MỘT TÊN DUY NHẤT.
+    - **Đối chiếu với Character Map:** Nếu map tồn tại, hãy đảm bảo mọi tên gốc trong "Văn Bản Gốc" đã được thay thế chính xác bằng tên mới từ map trong "Văn Bản Đã Viết Lại".
+    - **Đối chiếu với Văn Bản Gốc (nếu không có map hoặc level < 75%):** Đảm bảo tên nhân vật trong "Văn Bản Đã Viết Lại" là bản dịch/phiên âm nhất quán của tên trong "Văn Bản Gốc". Sửa lại bất kỳ sự thay đổi ngẫu nhiên nào.
+2.  **LOGIC CỐT TRUYỆN VÀ SỰ KIỆN:**
+    - So sánh các sự kiện chính giữa hai phiên bản. "Văn Bản Đã Viết Lại" có tạo ra "plot hole" hoặc mâu thuẫn với các sự kiện đã được thiết lập không? Sửa lại cho hợp lý.
+3.  **NHẤT QUÁN CHI TIẾT:**
+    - Kiểm tra các chi tiết nhỏ nhưng quan trọng (nghề nghiệp, tuổi tác, địa điểm, mối quan hệ). Chúng có nhất quán trong toàn bộ "Văn Bản Đã Viết Lại" không?
+4.  **CẢI THIỆN VĂN PHONG:**
+    - Loại bỏ các đoạn văn, câu chữ bị lặp lại không cần thiết.
+    - Cải thiện sự mượt mà, trôi chảy giữa các câu và đoạn văn.
 
-    **HƯỚNG DẪN BIÊN TẬP CHI TIẾT:**
-    1.  **Tính nhất quán (Consistency):**
-        *   **Tên Nhân Vật (QUAN TRỌNG NHẤT):** Rà soát kỹ TOÀN BỘ "Văn Bản Đã Viết Lại". Đảm bảo MỖI nhân vật (dù chính hay phụ, dù được giới thiệu ở đâu) chỉ sử dụng MỘT TÊN DUY NHẤT và nhất quán trong toàn bộ văn bản bằng ngôn ngữ ${selectedTargetLangLabel}. Nếu có sự nhầm lẫn, thay đổi tên giữa chừng (ví dụ: nhân vật A lúc đầu tên là X, sau lại là Y), hãy sửa lại cho đúng một tên duy nhất đã được thiết lập (ưu tiên tên xuất hiện nhiều hơn hoặc hợp lý hơn).
-        *   **Đặc Điểm/Vai Trò Nhân Vật:** Đặc điểm ngoại hình, tính cách, vai trò, mối quan hệ của nhân vật có được duy trì nhất quán từ đầu đến cuối không? Có hành động nào của nhân vật mâu thuẫn với những gì đã được thiết lập về họ trong "Văn Bản Đã Viết Lại" không?
-        *   **Logic Cốt Truyện và Sự Kiện:** Các sự kiện có diễn ra hợp lý, tuần tự và logic không? Có tình tiết nào trong "Văn Bản Đã Viết Lại" bị vô lý, mâu thuẫn với các sự kiện trước đó trong chính nó, hoặc tạo ra "plot hole" không? Dòng thời gian có nhất quán không?
-        *   **Tính nhất quán Địa Điểm và Chi Tiết:** Địa điểm và các chi tiết bối cảnh quan trọng khác có được mô tả và duy trì nhất quán không?
-    2.  **NÂNG CAO CHẤT LƯỢNG VĂN PHONG VÀ LOẠI BỎ TRÙNG LẶP (RẤT QUAN TRỌNG):**
-        *   **Loại bỏ Trùng Lặp và Từ Ngữ Thừa:** Rà soát kỹ lưỡng để loại bỏ mọi sự lặp lại không cần thiết về ý tưởng, thông tin, cụm từ, hoặc mô tả. Nếu một chi tiết, sự kiện, hoặc suy nghĩ của nhân vật đã được nêu rõ, tránh diễn đạt lại theo cách tương tự hoặc mô tả lại các chi tiết không cần thiết ở những đoạn văn/câu sau, trừ khi có mục đích nhấn mạnh nghệ thuật đặc biệt và hiệu quả. Tìm cách cô đọng các đoạn văn dài dòng, loại bỏ từ ngữ thừa, câu văn rườm rà để nội dung súc tích và mạch lạc hơn.
-        *   **Cải thiện Luồng Chảy và Mạch Lạc (Flow and Cohesion):** Đảm bảo các đoạn văn và câu chuyện chuyển tiếp mượt mà, tự nhiên. Sử dụng từ nối, cụm từ chuyển tiếp một cách hợp lý và đa dạng nếu cần. Sắp xếp lại câu hoặc đoạn văn nếu điều đó cải thiện tính mạch lạc và dễ đọc tổng thể.
-        *   **Đa dạng hóa Cấu trúc Câu:** Tránh việc lặp đi lặp lại cùng một kiểu cấu trúc câu đơn điệu (ví dụ: liên tục các câu bắt đầu bằng chủ ngữ - động từ). Hãy thay đổi độ dài câu (ngắn, dài, trung bình) và các kiểu câu (đơn, ghép, phức) để tạo nhịp điệu và làm cho văn bản hấp dẫn, dễ theo dõi hơn.
-        *   **Tinh chỉnh Lựa chọn Từ ngữ (Word Choice):** Ưu tiên sử dụng từ ngữ chính xác, giàu hình ảnh, và có sức biểu cảm cao. Tránh các từ ngữ chung chung, sáo rỗng hoặc yếu nghĩa.
-        *   **Duy trì Giọng điệu và Phong cách Gốc (của bản viết lại):** Trong quá trình tinh chỉnh, cố gắng duy trì giọng điệu (ví dụ: căng thẳng, hài hước, trang trọng) và phong cách văn chương chung đã được thiết lập trong "Văn Bản Đã Viết Lại". Các chỉnh sửa về văn phong nên nhằm mục đích làm cho nó tốt hơn, không phải thay đổi hoàn toàn bản chất của nó.
-    3.  **Mạch Lạc và Dễ Hiểu Chung (Overall Clarity):** Sau các bước trên, đọc lại toàn bộ để đảm bảo văn bản cuối cùng mạch lạc, dễ hiểu, các ý được diễn đạt rõ ràng.
-    4.  **Độ Dài:** Cố gắng duy trì độ dài TƯƠNG TỰ như "Văn Bản Đã Viết Lại" được cung cấp. Việc chỉnh sửa chủ yếu tập trung vào logic, nhất quán và chất lượng văn phong, không phải thay đổi độ dài đáng kể, trừ khi thực sự cần thiết để sửa lỗi logic nghiêm trọng hoặc do việc loại bỏ trùng lặp/thừa thãi một cách tự nhiên dẫn đến thay đổi.
-
-    **ĐẦU RA:**
-    - Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và tinh chỉnh hoàn chỉnh, bằng ngôn ngữ ${selectedTargetLangLabel}.
-    - Không thêm bất kỳ lời bình luận, giải thích hay tiêu đề nào.`;
+**ĐẦU RA:**
+- Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và sửa lỗi nhất quán hoàn chỉnh.
+- Không thêm bất kỳ lời bình luận hay giải thích nào.
+`;
 
     const systemInstructionForEdit = "You are a meticulous story editor. Your task is to refine and polish a given text, ensuring consistency, logical flow, and improved style, while respecting previous rewrite intentions.";
     
@@ -373,6 +372,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
         effectiveTargetLanguage,
         effectiveRewriteStyleForPrompt, // Use the same style context for editing
         effectiveAdaptContext,
+        characterMapUsed, // Pass character map for consistency checking
         item.id,
         (itemId, status, message) => updateResultCallback(itemId, { status: status, progressMessage: message }),
         textGenerator
@@ -383,7 +383,8 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
         status: 'completed', 
         progressMessage: 'Hoàn thành!', 
         error: null,
-        hasBeenEdited: true
+        hasBeenEdited: true,
+        characterMap: characterMapUsed
       });
 
     } catch (e) {
@@ -558,6 +559,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
             effectiveTargetLanguage,
             effectiveRewriteStyleForPrompt,
             effectiveAdaptContext,
+            resultItem.characterMap || null, // Pass character map for consistency checking
             resultId,
             (itemId, status, message) => {
                  setModuleState(prev => ({

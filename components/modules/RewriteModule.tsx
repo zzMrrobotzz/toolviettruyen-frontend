@@ -45,6 +45,21 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
     }, [targetLanguage, sourceLanguage]);
 
     const [isProcessing, setIsProcessing] = React.useState(false);
+    
+    // State for Character Map tracking
+    const [characterMapForSession, setCharacterMapForSession] = React.useState<string | null>(null);
+
+    // Helper function to extract character map from AI response
+    const extractCharacterMap = (aiResponse: string): string | null => {
+        const mapRegex = /\[CHARACTER_MAP\](.*?)\[\/CHARACTER_MAP\]/s;
+        const match = aiResponse.match(mapRegex);
+        return match ? match[1].trim() : null;
+    };
+
+    // Helper function to remove character map from AI response
+    const removeCharacterMapFromResponse = (aiResponse: string): string => {
+        return aiResponse.replace(/\[CHARACTER_MAP\].*?\[\/CHARACTER_MAP\]/s, '').trim();
+    };
 
     // Tất cả các onChange input/select/slider chỉ gọi updateStateInput, không reset rewrittenText
     // Khi bấm nút Viết lại Văn bản, mới reset rewrittenText
@@ -61,8 +76,9 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
             setIsProcessing(false);
             return;
         }
-        // Chỉ reset rewrittenText ở đây
+        // Chỉ reset rewrittenText ở đây và reset character map
         setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: '', error: null, progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false } }));
+        setCharacterMapForSession(null);
         
         const CHUNK_CHAR_COUNT = 4000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
@@ -100,6 +116,40 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
                     rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${effectiveStyle}.`;
                 }
 
+                // Character consistency instructions based on rewrite level and chunk position
+                let characterConsistencyInstructions = '';
+                if (rewriteLevel >= 75) {
+                    if (i === 0) {
+                        // First chunk for high-level rewrite: needs character mapping
+                        characterConsistencyInstructions = `
+
+**Character Mapping (MANDATORY for First Chunk if Level >= 75%):**
+Your primary goal for character names is consistency in the ${selectedTargetLangLabel} output.
+Identify ALL character names (main, secondary, recurring) that YOU, the AI, are PURPOSEFULLY and CREATIVELY altering from their form in the ${selectedSourceLangLabel} text to a new, distinct form in your ${selectedTargetLangLabel} rewritten text for THIS CHUNK. This includes significant re-spellings, translations that are creative choices rather than direct equivalents, or entirely new names. For each such change, record it.
+At the VERY END of your entire response for THIS CHUNK, append these changes in the format:
+"[CHARACTER_MAP]Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 1 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 1; Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 2 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 2[/CHARACTER_MAP]"
+If you make NO such purposeful creative changes to ANY character names (i.e., they are kept original, or receive only direct, standard translations that will be applied consistently per the general character consistency rule), you MUST append:
+"[CHARACTER_MAP]Không có thay đổi tên nhân vật chính nào được map[/CHARACTER_MAP]"
+This map (or the 'no change' signal) is VITAL for consistency in subsequent chunks. This instruction and its output are ONLY for this first chunk and MUST be outside the main rewritten story text.`;
+                    } else {
+                        // Subsequent chunks for high-level rewrite: use character map
+                        characterConsistencyInstructions = `
+
+**ABSOLUTE CHARACTER CONSISTENCY MANDATE (Based on Character Map for Level >= 75%):**
+You are provided with a Character Map: \`${characterMapForSession}\`. You MUST adhere to this with 100% accuracy.
+- If the map provides \`Original -> New\` pairs: Use the 'New Name' EXACTLY AS SPECIFIED for every instance of the 'Original Name'.
+- If the map states 'Không có thay đổi...': You MUST continue using the exact naming convention for ALL characters as established in the first rewritten chunk.
+- For ANY character not in the map, you MUST maintain the name used in the first rewritten chunk.
+- **DO NOT re-translate, vary, or introduce alternative names for any character already named.**`;
+                    }
+                } else {
+                    // Low/Mid-level rewrites: strengthen consistency
+                    characterConsistencyInstructions = `
+
+**CRITICAL NARRATIVE INTEGRITY (SINGLE TRUTH MANDATE):** You are rewriting ONE SINGLE STORY. All details regarding characters (names, roles, relationships), plot points, events, and locations MUST remain ABSOLUTELY CONSISTENT with what has been established in previously rewritten chunks (provided as context, which is THE CANON for this session). DO NOT introduce conflicting information. Maintain ONE UNIFIED AND LOGICAL NARRATIVE THREAD.
+- **ABSOLUTE CHARACTER NAME CONSISTENCY:** Once a name is established for ANY character in the \`${selectedTargetLangLabel}\` output, that name MUST be used with 100% consistency for that character throughout ALL subsequent parts. DO NOT change it later.`;
+                }
+
                 const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.
 
 **Instructions:**
@@ -111,6 +161,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
 - **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
 - **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.
 ${localizationRequest}
+${characterConsistencyInstructions}
 
 **Context from Previous Chunks (already in ${selectedTargetLangLabel}):**
 ---
@@ -131,7 +182,19 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 const request = { prompt, provider: apiSettings?.provider || 'gemini' };
                 const result = await generateTextViaBackend(request, (newCredit) => {});
                 if (!result.success) throw new Error(result.error || 'AI generation failed');
-                fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + (result.text || '').trim();
+                
+                let chunkResult = (result.text || '').trim();
+                
+                // Extract character map if this is the first chunk of a high-level rewrite
+                if (i === 0 && rewriteLevel >= 75) {
+                    const extractedMap = extractCharacterMap(chunkResult);
+                    if (extractedMap) {
+                        setCharacterMapForSession(extractedMap);
+                        chunkResult = removeCharacterMapFromResponse(chunkResult);
+                    }
+                }
+                
+                fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + chunkResult;
                 setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: fullRewrittenText } })); // Update UI progressively
             }
             setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: fullRewrittenText.trim() } }));
@@ -152,22 +215,38 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         try {
             updateStateInput({ loadingMessage: 'Đang tự động biên tập để đảm bảo tính nhất quán...' });
             
-            const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.
+            const editPrompt = `You are a meticulous story editor with an eidetic memory. Your task is to find and fix every single consistency error in the "Văn Bản Đã Viết Lại". You will cross-reference it against the "Văn Bản Gốc Ban Đầu" and the "Character Map" to ensure perfect logical and narrative integrity.
 
-**Text to Edit:**
+**CONTEXT FOR EDITING:**
+- Rewrite Level Previously Applied: ${rewriteLevel}%
+- Character Map Generated During Rewrite: \`${characterMapForSession || 'Không có'}\`
+
+**VĂN BẢN GỐC BAN ĐẦU (để đối chiếu logic và các yếu tố gốc):**
+---
+${originalText}
+---
+
+**VĂN BẢN ĐÃ VIẾT LẠI (Cần bạn biên tập và tinh chỉnh):**
 ---
 ${textToEdit}
 ---
 
-**Editing Instructions:**
-1.  **Consistency:** Ensure character names, locations, and plot points are consistent throughout the text. Correct any contradictions.
-2.  **Flow and Cohesion:** Improve the flow between sentences and paragraphs. Ensure smooth transitions.
-3.  **Clarity and Conciseness:** Remove repetitive phrases and redundant words. Clarify any confusing sentences.
-4.  **Grammar and Spelling:** Correct any grammatical errors or typos.
-5.  **Timestamp Check (Final):** Double-check and ensure absolutely NO timestamps (e.g., (11:42)) remain in the final text. The output must be a clean narrative.
+**HƯỚNG DẪN BIÊN TẬP NGHIÊM NGẶT:**
+1.  **NHẤT QUÁN TÊN NHÂN VẬT (QUAN TRỌNG NHẤT):**
+    - Rà soát kỹ TOÀN BỘ "Văn Bản Đã Viết Lại". Đảm bảo MỖI nhân vật chỉ sử dụng MỘT TÊN DUY NHẤT.
+    - **Đối chiếu với Character Map:** Nếu map tồn tại, hãy đảm bảo mọi tên gốc trong "Văn Bản Gốc" đã được thay thế chính xác bằng tên mới từ map trong "Văn Bản Đã Viết Lại".
+    - **Đối chiếu với Văn Bản Gốc (nếu không có map hoặc level < 75%):** Đảm bảo tên nhân vật trong "Văn Bản Đã Viết Lại" là bản dịch/phiên âm nhất quán của tên trong "Văn Bản Gốc". Sửa lại bất kỳ sự thay đổi ngẫu nhiên nào.
+2.  **LOGIC CỐT TRUYỆN VÀ SỰ KIỆN:**
+    - So sánh các sự kiện chính giữa hai phiên bản. "Văn Bản Đã Viết Lại" có tạo ra "plot hole" hoặc mâu thuẫn với các sự kiện đã được thiết lập không? Sửa lại cho hợp lý.
+3.  **NHẤT QUÁN CHI TIẾT:**
+    - Kiểm tra các chi tiết nhỏ nhưng quan trọng (nghề nghiệp, tuổi tác, địa điểm, mối quan hệ). Chúng có nhất quán trong toàn bộ "Văn Bản Đã Viết Lại" không?
+4.  **CẢI THIỆN VĂN PHONG:**
+    - Loại bỏ các đoạn văn, câu chữ bị lặp lại không cần thiết.
+    - Cải thiện sự mượt mà, trôi chảy giữa các câu và đoạn văn.
 
-**Output:**
-Return ONLY the fully edited and polished text. Do not add any commentary or explanations.
+**ĐẦU RA:**
+- Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và sửa lỗi nhất quán hoàn chỉnh.
+- Không thêm bất kỳ lời bình luận hay giải thích nào.
 `;
             
             const result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
@@ -200,22 +279,38 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
         setIsProcessing(true);
         updateStateInput({ isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false });
         
-        const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.
+        const editPrompt = `You are a meticulous story editor with an eidetic memory. Your task is to find and fix every single consistency error in the "Văn Bản Đã Viết Lại". You will cross-reference it against the "Văn Bản Gốc Ban Đầu" and the "Character Map" to ensure perfect logical and narrative integrity.
 
-**Text to Edit:**
+**CONTEXT FOR EDITING:**
+- Rewrite Level Previously Applied: ${rewriteLevel}%
+- Character Map Generated During Rewrite: \`${characterMapForSession || 'Không có'}\`
+
+**VĂN BẢN GỐC BAN ĐẦU (để đối chiếu logic và các yếu tố gốc):**
+---
+${originalText}
+---
+
+**VĂN BẢN ĐÃ VIẾT LẠI (Cần bạn biên tập và tinh chỉnh):**
 ---
 ${rewrittenText}
 ---
 
-**Editing Instructions:**
-1.  **Consistency:** Ensure character names, locations, and plot points are consistent throughout the text. Correct any contradictions.
-2.  **Flow and Cohesion:** Improve the flow between sentences and paragraphs. Ensure smooth transitions.
-3.  **Clarity and Conciseness:** Remove repetitive phrases and redundant words. Clarify any confusing sentences.
-4.  **Grammar and Spelling:** Correct any grammatical errors or typos.
-5.  **Timestamp Check (Final):** Double-check and ensure absolutely NO timestamps (e.g., (11:42)) remain in the final text. The output must be a clean narrative.
+**HƯỚNG DẪN BIÊN TẬP NGHIÊM NGẶT:**
+1.  **NHẤT QUÁN TÊN NHÂN VẬT (QUAN TRỌNG NHẤT):**
+    - Rà soát kỹ TOÀN BỘ "Văn Bản Đã Viết Lại". Đảm bảo MỖI nhân vật chỉ sử dụng MỘT TÊN DUY NHẤT.
+    - **Đối chiếu với Character Map:** Nếu map tồn tại, hãy đảm bảo mọi tên gốc trong "Văn Bản Gốc" đã được thay thế chính xác bằng tên mới từ map trong "Văn Bản Đã Viết Lại".
+    - **Đối chiếu với Văn Bản Gốc (nếu không có map hoặc level < 75%):** Đảm bảo tên nhân vật trong "Văn Bản Đã Viết Lại" là bản dịch/phiên âm nhất quán của tên trong "Văn Bản Gốc". Sửa lại bất kỳ sự thay đổi ngẫu nhiên nào.
+2.  **LOGIC CỐT TRUYỆN VÀ SỰ KIỆN:**
+    - So sánh các sự kiện chính giữa hai phiên bản. "Văn Bản Đã Viết Lại" có tạo ra "plot hole" hoặc mâu thuẫn với các sự kiện đã được thiết lập không? Sửa lại cho hợp lý.
+3.  **NHẤT QUÁN CHI TIẾT:**
+    - Kiểm tra các chi tiết nhỏ nhưng quan trọng (nghề nghiệp, tuổi tác, địa điểm, mối quan hệ). Chúng có nhất quán trong toàn bộ "Văn Bản Đã Viết Lại" không?
+4.  **CẢI THIỆN VĂN PHONG:**
+    - Loại bỏ các đoạn văn, câu chữ bị lặp lại không cần thiết.
+    - Cải thiện sự mượt mà, trôi chảy giữa các câu và đoạn văn.
 
-**Output:**
-Return ONLY the fully edited and polished text. Do not add any commentary or explanations.
+**ĐẦU RA:**
+- Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và sửa lỗi nhất quán hoàn chỉnh.
+- Không thêm bất kỳ lời bình luận hay giải thích nào.
 `;
         
         try {
