@@ -132,18 +132,30 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
     }
     setPaying(true);
     try {
-      console.log('Creating payment for:', { key: currentKey, credit: creditAmount });
+      console.log('Creating payment for package:', pkg);
+      console.log('Key:', currentKey);
+      console.log('Credit amount:', creditAmount);
+      console.log('Package price:', pkg.price);
       console.log('API URL:', `${API_BASE_URL}/payment/create`);
       
       // Thử các format khác nhau cho backend
       console.log('Trying different payload formats...');
       let res;
       const payloads = [
+        // Thử với số nguyên rõ ràng
+        { key: currentKey, creditAmount: parseInt(creditAmount.toString()) },
+        { key: currentKey, credit_amount: parseInt(creditAmount.toString()) },
+        // Thử với price thay vì credit
+        { key: currentKey, amount: pkg.price },
+        { key: currentKey, price: pkg.price, credits: creditAmount },
+        // Format gốc
         { key: currentKey, creditAmount: creditAmount },
         { key: currentKey, packageId: pkg._id, amount: pkg.price, credits: pkg.credits },
         { key: currentKey, amount: creditAmount },
         { key: currentKey, credit: creditAmount },
         { key: currentKey, credits: creditAmount },
+        // Thử format string
+        { key: currentKey, creditAmount: creditAmount.toString() },
         { key: currentKey, package: pkg }
       ];
 
@@ -227,7 +239,42 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       console.error('Error response:', error?.response?.data);
       
       let detail = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Lỗi tạo đơn thanh toán!';
-      setModal({ open: true, title: 'Lỗi nạp credit', content: `Chi tiết lỗi: ${detail}` });
+      
+      // Show mock payment info as fallback
+      console.log('All API attempts failed, showing mock payment info');
+      setModal({
+        open: true,
+        title: 'Thông tin thanh toán (Demo)',
+        content: (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: 16, padding: 16, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8 }}>
+              <p style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: 8 }}>⚠️ Chế độ Demo</p>
+              <p style={{ fontSize: 14, color: '#666' }}>Backend API chưa sẵn sàng. Đây là thông tin thanh toán mẫu.</p>
+            </div>
+            
+            <div style={{ border: '1px solid #d9d9d9', borderRadius: 8, padding: 16 }}>
+              <h4>📦 {pkg.name}</h4>
+              <p><strong>Giá:</strong> {pkg.price.toLocaleString('vi-VN')} VNĐ</p>
+              <p><strong>Credit nhận được:</strong> {pkg.credits} credits</p>
+              {pkg.bonus && <p><strong>Ưu đãi:</strong> {pkg.bonus}</p>}
+              
+              <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                <p style={{ margin: 0, fontSize: 13, color: '#389e0d' }}>
+                  <strong>Hướng dẫn:</strong> Chuyển khoản {pkg.price.toLocaleString('vi-VN')} VNĐ<br/>
+                  Nội dung: <code>CREDIT {currentKey}</code>
+                </p>
+              </div>
+              
+              <div style={{ marginTop: 16, fontSize: 12, color: '#666' }}>
+                <strong>Debug info:</strong><br/>
+                Key: {currentKey}<br/>
+                Credit Amount: {creditAmount}<br/>
+                Error: {detail}
+              </div>
+            </div>
+          </div>
+        )
+      });
       await new Promise(r => setTimeout(r, 2000));
     }
     setPaying(false);
