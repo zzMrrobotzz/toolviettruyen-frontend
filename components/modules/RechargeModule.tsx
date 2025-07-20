@@ -176,7 +176,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
         }
       }
       console.log('Payment response:', res.data);
-      if (res.data?.success && res.data?.transferInfo) {
+      if (res.data?.success && (res.data?.transferInfo || res.data?.qrData || res.data?.payUrl)) {
         const { transferInfo, qrData, payUrl } = res.data;
         setModal({
           open: true,
@@ -187,14 +187,16 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
                 <QRCodeWrapper value={qrData || payUrl} size={200} />
               </div>
               
-              <div style={{ backgroundColor: '#f5f5f5', padding: 16, borderRadius: 8, marginBottom: 16 }}>
-                <h4 style={{ margin: '0 0 8px 0' }}>Thông tin chuyển khoản:</h4>
-                <div><b>Ngân hàng:</b> {transferInfo.bankName}</div>
-                <div><b>Số tài khoản:</b> {transferInfo.accountNumber}</div>
-                <div><b>Tên người nhận:</b> {transferInfo.accountName}</div>
-                <div><b>Số tiền:</b> <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{transferInfo.amount.toLocaleString()} VND</span></div>
-                <div><b>Nội dung CK:</b> <span style={{ color: '#1890ff', fontWeight: 'bold' }}>{transferInfo.content}</span></div>
-              </div>
+              {transferInfo && (
+                <div style={{ backgroundColor: '#f5f5f5', padding: 16, borderRadius: 8, marginBottom: 16 }}>
+                  <h4 style={{ margin: '0 0 8px 0' }}>Thông tin chuyển khoản:</h4>
+                  <div><b>Ngân hàng:</b> {transferInfo.bankName}</div>
+                  <div><b>Số tài khoản:</b> {transferInfo.accountNumber}</div>
+                  <div><b>Tên người nhận:</b> {transferInfo.accountName}</div>
+                  <div><b>Số tiền:</b> <span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{transferInfo.amount.toLocaleString()} VND</span></div>
+                  <div><b>Nội dung CK:</b> <span style={{ color: '#1890ff', fontWeight: 'bold' }}>{transferInfo.content}</span></div>
+                </div>
+              )}
 
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <Button 
