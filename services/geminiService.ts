@@ -44,7 +44,14 @@ export const generateText = async (
     const request: GenerateContentParameters = {
       model: MODEL_TEXT,
       contents: { role: 'user', parts: contents },
-      config: {},
+      config: {
+        generationConfig: {
+          maxOutputTokens: 8192,
+          temperature: 0.7,
+          topP: 0.8,
+          topK: 40
+        }
+      },
     };
 
     if (systemInstruction && request.config) {
@@ -97,6 +104,12 @@ export const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstr
       contents: { role: 'user', parts: contents },
       config: {
         responseMimeType: "application/json",
+        generationConfig: {
+          maxOutputTokens: 8192,
+          temperature: 0.7,
+          topP: 0.8,
+          topK: 40
+        }
       },
     };
 
@@ -185,7 +198,14 @@ export const generateTextFromImageAndText = async (
     const request: GenerateContentParameters = {
       model: MODEL_TEXT, // Use multimodal text model
       contents: { role: 'user', parts: [imagePart, textPart] },
-      config: {},
+      config: {
+        generationConfig: {
+          maxOutputTokens: 8192,
+          temperature: 0.7,
+          topP: 0.8,
+          topK: 40
+        }
+      },
     };
 
     if (systemInstruction && request.config) {
