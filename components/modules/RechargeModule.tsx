@@ -106,8 +106,10 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
   }, []);
 
   // Nạp credit
-  const handleRecharge = async (creditAmount: number) => {
-    console.log('handleRecharge called with:', { creditAmount, currentKey });
+  const handleRecharge = async (pkg: CreditPackage) => {
+    console.log('handleRecharge called with package:', pkg);
+    console.log('Current key:', currentKey);
+    const creditAmount = pkg.credits;
     
     if (!currentKey || currentKey.trim() === '') {
       console.error('No currentKey available:', { currentKey, length: currentKey?.length });
@@ -133,7 +135,32 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       console.log('Creating payment for:', { key: currentKey, credit: creditAmount });
       console.log('API URL:', `${API_BASE_URL}/payment/create`);
       
-      const res = await axios.post(`${API_BASE_URL}/payment/create`, { key: currentKey, credit: creditAmount });
+      // Thử các format khác nhau cho backend
+      console.log('Trying different payload formats...');
+      let res;
+      const payloads = [
+        { key: currentKey, packageId: pkg._id, amount: pkg.price, credits: pkg.credits },
+        { key: currentKey, amount: creditAmount },
+        { key: currentKey, credit: creditAmount },
+        { key: currentKey, credits: creditAmount },
+        { key: currentKey, package: pkg }
+      ];
+
+      let lastError = null;
+      for (let i = 0; i < payloads.length; i++) {
+        try {
+          console.log(`Attempt ${i + 1} with payload:`, payloads[i]);
+          res = await axios.post(`${API_BASE_URL}/payment/create`, payloads[i]);
+          console.log(`Attempt ${i + 1} succeeded!`);
+          break;
+        } catch (err) {
+          console.log(`Attempt ${i + 1} failed:`, err.response?.data || err.message);
+          lastError = err;
+          if (i === payloads.length - 1) {
+            throw lastError;
+          }
+        }
+      }
       console.log('Payment response:', res.data);
       if (res.data?.success && res.data?.transferInfo) {
         const { transferInfo, qrData, payUrl } = res.data;
@@ -277,7 +304,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
                     type="primary"
                     loading={paying}
                     disabled={paying}
-                    onClick={() => handleRecharge(pkg.credits)}
+                    onClick={() => handleRecharge(pkg)}
                     style={{ width: '100%' }}
                   >
                     {paying ? 'Đang xử lý...' : 'Nạp gói này'}
