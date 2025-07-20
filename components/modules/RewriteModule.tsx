@@ -215,7 +215,7 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         try {
             updateStateInput({ loadingMessage: 'Đang tự động biên tập để đảm bảo tính nhất quán...' });
             
-            const editPrompt = `You are a meticulous story editor with an eidetic memory. Your task is to find and fix every single consistency error in the "Văn Bản Đã Viết Lại". You will cross-reference it against the "Văn Bản Gốc Ban Đầu" and the "Character Map" to ensure perfect logical and narrative integrity.
+            const fullEditPrompt = `You are a meticulous story editor with an eidetic memory. Your task is to find and fix every single consistency error in the "Văn Bản Đã Viết Lại". You will cross-reference it against the "Văn Bản Gốc Ban Đầu" and the "Character Map" to ensure perfect logical and narrative integrity.
 
 **CONTEXT FOR EDITING:**
 - Rewrite Level Previously Applied: ${rewriteLevel}%
@@ -248,8 +248,35 @@ ${textToEdit}
 - Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và sửa lỗi nhất quán hoàn chỉnh.
 - Không thêm bất kỳ lời bình luận hay giải thích nào.
 `;
+
+            // Fallback prompt if main prompt fails
+            const fallbackEditPrompt = `You are a story editor. Edit this text for consistency and clarity:
+
+**Text to Edit:**
+${textToEdit}
+
+**Instructions:**
+1. Ensure character names are consistent throughout
+2. Fix any plot contradictions
+3. Improve flow and grammar
+4. Return only the edited text
+
+**Output:**
+Return only the edited text without explanations.`;
+
+            let result;
+            try {
+                // Try full prompt first
+                console.log(`🎯 Attempting auto-edit with full prompt (${fullEditPrompt.length} chars)`);
+                result = await generateTextViaBackend({ prompt: fullEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+            } catch (mainError) {
+                console.warn(`❌ Full prompt failed: ${(mainError as Error).message}, trying fallback`);
+                updateStateInput({ loadingMessage: 'Prompt chính lỗi, đang thử phương án dự phòng...' });
+                
+                // Try fallback prompt
+                result = await generateTextViaBackend({ prompt: fallbackEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+            }
             
-            const result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
             if (!result.success) throw new Error(result.error || 'AI generation failed');
             
             setModuleState(prev => ({ 
@@ -263,10 +290,10 @@ ${textToEdit}
             }));
             
         } catch (e) {
-            console.error('Auto edit error:', e);
+            console.error('❌ Auto edit completely failed:', e);
             updateStateInput({ 
-                loadingMessage: 'Lỗi biên tập tự động, nhưng văn bản đã viết lại thành công!',
-                editError: `Lỗi biên tập tự động: ${(e as Error).message}` 
+                loadingMessage: 'Biên tập tự động không thể thực hiện, nhưng văn bản viết lại vẫn hoàn tất!',
+                editError: `Lỗi biên tập tự động: ${(e as Error).message}. Bạn có thể dùng nút "Biên Tập & Tinh Chỉnh" thủ công.` 
             });
         }
     };
