@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Button, Row, Col, Typography, Spin, Modal } from 'antd';
 import axios from 'axios';
-import { API_BASE_URL } from '../../config';
+import { PAYMENT_API_URL, MAIN_API_URL } from '../../config';
 import QRCodeWrapper from './QRCodeWrapper';
 import { mockPaymentService } from '../../services/mockPaymentService';
 
@@ -59,7 +59,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
   const fetchPackages = async () => {
     setPackagesLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/packages`);
+      const res = await axios.get(`${MAIN_API_URL}/packages`);
       console.log('Packages response:', res.data);
       
       if (res.data.success && res.data.packages && res.data.packages.length > 0) {
@@ -85,7 +85,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
     if (!currentKey) return;
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}/keys/validate`, { key: currentKey });
+      const res = await axios.post(`${MAIN_API_URL}/keys/validate`, { key: currentKey });
       setCredit(res.data?.keyInfo?.credit ?? 0);
     } catch (err) {
       setModal({ open: true, title: 'Lỗi', content: 'Không lấy được số credit!' });
@@ -137,7 +137,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       console.log('Key:', currentKey);
       console.log('Credit amount:', creditAmount);
       console.log('Package price:', pkg.price);
-      console.log('API URL:', `${API_BASE_URL}/payment/create`);
+      console.log('Payment API URL:', `${PAYMENT_API_URL}/api/payment/create`);
       
       // Thử các format khác nhau cho backend
       console.log('Trying different payload formats...');
@@ -164,7 +164,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       for (let i = 0; i < payloads.length; i++) {
         try {
           console.log(`Attempt ${i + 1} with payload:`, payloads[i]);
-          res = await axios.post(`${API_BASE_URL}/payment/create`, payloads[i]);
+          res = await axios.post(`${PAYMENT_API_URL}/api/payment/create`, payloads[i]);
           console.log(`Attempt ${i + 1} succeeded!`);
           break;
         } catch (err) {
