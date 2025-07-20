@@ -3,6 +3,7 @@ import { Card, Button, Row, Col, Typography, Spin, Modal } from 'antd';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config';
 import QRCodeWrapper from './QRCodeWrapper';
+import { mockPaymentService } from '../../services/mockPaymentService';
 
 interface CreditPackage {
   _id: string;
@@ -235,47 +236,79 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       }
     } catch (err) {
       const error: any = err;
-      console.error('Payment creation error:', error);
-      console.error('Error response:', error?.response?.data);
+      console.error('Payment creation error, falling back to mock service:', error);
       
-      let detail = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Lỗi tạo đơn thanh toán!';
-      
-      // Show mock payment info as fallback
-      console.log('All API attempts failed, showing mock payment info');
-      setModal({
-        open: true,
-        title: 'Thông tin thanh toán (Demo)',
-        content: (
-          <div>
-            <div style={{ textAlign: 'center', marginBottom: 16, padding: 16, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8 }}>
-              <p style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: 8 }}>⚠️ Chế độ Demo</p>
-              <p style={{ fontSize: 14, color: '#666' }}>Backend API chưa sẵn sàng. Đây là thông tin thanh toán mẫu.</p>
-            </div>
-            
-            <div style={{ border: '1px solid #d9d9d9', borderRadius: 8, padding: 16 }}>
-              <h4>📦 {pkg.name}</h4>
-              <p><strong>Giá:</strong> {pkg.price.toLocaleString('vi-VN')} VNĐ</p>
-              <p><strong>Credit nhận được:</strong> {pkg.credits} credits</p>
-              {pkg.bonus && <p><strong>Ưu đãi:</strong> {pkg.bonus}</p>}
-              
-              <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
-                <p style={{ margin: 0, fontSize: 13, color: '#389e0d' }}>
-                  <strong>Hướng dẫn:</strong> Chuyển khoản {pkg.price.toLocaleString('vi-VN')} VNĐ<br/>
-                  Nội dung: <code>CREDIT {currentKey}</code>
-                </p>
+      try {
+        // Fallback to mock payment service
+        console.log('Using mock payment service...');
+        const mockResponse = await mockPaymentService.createPayment(currentKey, pkg);
+        
+        if (mockResponse.success) {
+          const { transferInfo, qrData, payUrl } = mockResponse;
+          setModal({
+            open: true,
+            title: 'Thông tin thanh toán',
+            content: (
+              <div>
+                <div style={{ textAlign: 'center', marginBottom: 16, padding: 12, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6 }}>
+                  <p style={{ color: '#fa8c16', fontWeight: 'bold', marginBottom: 4, fontSize: 14 }}>🔧 Mock Payment Service</p>
+                  <p style={{ fontSize: 12, color: '#666', margin: 0 }}>Sử dụng hệ thống thanh toán mô phỏng</p>
+                </div>
+                
+                <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                  <QRCodeWrapper value={qrData || payUrl} size={200} />
+                </div>
+
+                <div style={{ border: '1px solid #d9d9d9', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+                  <h4 style={{ margin: '0 0 12px 0' }}>🏦 Thông tin chuyển khoản</h4>
+                  <p><strong>Ngân hàng:</strong> {transferInfo.bankName}</p>
+                  <p><strong>Số tài khoản:</strong> {transferInfo.accountNumber}</p>
+                  <p><strong>Chủ tài khoản:</strong> {transferInfo.accountHolder}</p>
+                  <p><strong>Số tiền:</strong> {transferInfo.amount.toLocaleString('vi-VN')} VNĐ</p>
+                  <p><strong>Nội dung:</strong> <code>{transferInfo.content}</code></p>
+                </div>
+
+                <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                  <Button 
+                    type="primary" 
+                    size="large"
+                    onClick={() => window.open(payUrl, '_blank')}
+                    style={{ marginRight: 8 }}
+                  >
+                    🔗 Thanh toán PayOS
+                  </Button>
+                  <Button 
+                    type="default"
+                    onClick={() => {
+                      setTimeout(() => {
+                        fetchCredit();
+                      }, 5000);
+                    }}
+                  >
+                    ⏰ Kiểm tra tự động
+                  </Button>
+                </div>
+                
+                <div style={{ fontSize: '13px', color: '#666' }}>
+                  <b>Hướng dẫn thanh toán:</b><br />
+                  🎯 <b>Tự động (PayOS):</b> Bấm "Thanh toán PayOS" → Chọn ngân hàng → Thanh toán → Credit tự động cộng<br />
+                  📱 <b>QR Code:</b> Quét mã QR bằng app ngân hàng → Thanh toán<br />
+                  🏦 <b>Chuyển khoản:</b> Chuyển theo thông tin trên + <b>GHI ĐÚNG nội dung</b><br />
+                  ⏰ Sau thanh toán: Credit sẽ tự động cập nhật trong vài phút<br />
+                  🆘 Cần hỗ trợ: Liên hệ admin nếu có vấn đề
+                </div>
               </div>
-              
-              <div style={{ marginTop: 16, fontSize: 12, color: '#666' }}>
-                <strong>Debug info:</strong><br/>
-                Key: {currentKey}<br/>
-                Credit Amount: {creditAmount}<br/>
-                Error: {detail}
-              </div>
-            </div>
-          </div>
-        )
-      });
-      await new Promise(r => setTimeout(r, 2000));
+            ),
+          });
+        } else {
+          throw new Error('Mock payment service failed');
+        }
+      } catch (mockError) {
+        console.error('Mock payment service also failed:', mockError);
+        const detail = error?.response?.data?.error || error?.message || 'Lỗi tạo đơn thanh toán!';
+        setModal({ open: true, title: 'Lỗi nạp credit', content: `Chi tiết lỗi: ${detail}` });
+      }
+      await new Promise(r => setTimeout(r, 1000));
     }
     setPaying(false);
   };
