@@ -178,10 +178,24 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
 `;
                 
                 await delay(500); // Simulate API call delay
-                // Gọi API chuẩn và cập nhật credit nếu cần
+                // Gọi API với enhanced error handling
                 const request = { prompt, provider: apiSettings?.provider || 'gemini' };
-                const result = await generateTextViaBackend(request, (newCredit) => {});
-                if (!result.success) throw new Error(result.error || 'AI generation failed');
+                let result;
+                try {
+                    result = await generateTextViaBackend(request, (newCredit) => {});
+                    if (!result.success) {
+                        throw new Error(result.error || 'AI generation failed');
+                    }
+                } catch (networkError) {
+                    const errorMsg = (networkError as Error).message;
+                    if (errorMsg.includes('Failed to fetch') || errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
+                        throw new Error('Kết nối backend bị gián đoạn. Vui lòng thử lại sau vài giây.');
+                    }
+                    if (errorMsg.includes('CORS')) {
+                        throw new Error('Lỗi CORS policy. Vui lòng refresh trang và thử lại.');
+                    }
+                    throw networkError;
+                }
                 
                 let chunkResult = (result.text || '').trim();
                 
@@ -266,15 +280,33 @@ Return only the edited text without explanations.`;
 
             let result;
             try {
-                // Try full prompt first
+                // Try full prompt first with enhanced error handling
                 console.log(`🎯 Attempting auto-edit with full prompt (${fullEditPrompt.length} chars)`);
-                result = await generateTextViaBackend({ prompt: fullEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+                try {
+                    result = await generateTextViaBackend({ prompt: fullEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+                    if (!result.success) throw new Error(result.error || 'Main prompt failed');
+                } catch (networkError) {
+                    const errorMsg = (networkError as Error).message;
+                    if (errorMsg.includes('Failed to fetch') || errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
+                        throw new Error('Backend connection interrupted');
+                    }
+                    throw networkError;
+                }
             } catch (mainError) {
                 console.warn(`❌ Full prompt failed: ${(mainError as Error).message}, trying fallback`);
                 updateStateInput({ loadingMessage: 'Prompt chính lỗi, đang thử phương án dự phòng...' });
                 
-                // Try fallback prompt
-                result = await generateTextViaBackend({ prompt: fallbackEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+                // Try fallback prompt with the same enhanced error handling
+                try {
+                    result = await generateTextViaBackend({ prompt: fallbackEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+                    if (!result.success) throw new Error(result.error || 'Fallback prompt failed');
+                } catch (fallbackNetworkError) {
+                    const errorMsg = (fallbackNetworkError as Error).message;
+                    if (errorMsg.includes('Failed to fetch') || errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
+                        throw new Error('Backend không khả dụng. Vui lòng thử lại sau.');
+                    }
+                    throw fallbackNetworkError;
+                }
             }
             
             if (!result.success) throw new Error(result.error || 'AI generation failed');
@@ -341,8 +373,20 @@ ${rewrittenText}
 `;
         
         try {
-            const result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
-            if (!result.success) throw new Error(result.error || 'AI generation failed');
+            let result;
+            try {
+                result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+                if (!result.success) throw new Error(result.error || 'AI generation failed');
+            } catch (networkError) {
+                const errorMsg = (networkError as Error).message;
+                if (errorMsg.includes('Failed to fetch') || errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
+                    throw new Error('Kết nối backend bị gián đoạn. Vui lòng thử lại sau vài giây.');
+                }
+                if (errorMsg.includes('CORS')) {
+                    throw new Error('Lỗi CORS policy. Vui lòng refresh trang và thử lại.');
+                }
+                throw networkError;
+            }
             setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: result.text || '', isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true } }));
         } catch (e) {
             updateStateInput({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
