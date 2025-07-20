@@ -135,13 +135,60 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                 setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: fullRewrittenText } })); // Update UI progressively
             }
             setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: fullRewrittenText.trim() } }));
-            updateStateInput({ loadingMessage: 'Hoàn thành!', progress: 100 });
+            updateStateInput({ loadingMessage: 'Hoàn thành! Đang tự động biên tập...', progress: 100 });
+            
+            // Tự động biên tập để đảm bảo tính nhất quán
+            await autoEditAfterRewrite(fullRewrittenText.trim());
         } catch (e) {
             updateStateInput({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
         } finally {
             // Không xóa loadingMessage bằng setTimeout nữa
             updateStateInput({ loadingMessage: null });
             setIsProcessing(false);
+        }
+    };
+
+    const autoEditAfterRewrite = async (textToEdit: string) => {
+        try {
+            updateStateInput({ loadingMessage: 'Đang tự động biên tập để đảm bảo tính nhất quán...' });
+            
+            const editPrompt = `You are a meticulous story editor. Your task is to refine and polish the given text, ensuring consistency, logical flow, and improved style.
+
+**Text to Edit:**
+---
+${textToEdit}
+---
+
+**Editing Instructions:**
+1.  **Consistency:** Ensure character names, locations, and plot points are consistent throughout the text. Correct any contradictions.
+2.  **Flow and Cohesion:** Improve the flow between sentences and paragraphs. Ensure smooth transitions.
+3.  **Clarity and Conciseness:** Remove repetitive phrases and redundant words. Clarify any confusing sentences.
+4.  **Grammar and Spelling:** Correct any grammatical errors or typos.
+5.  **Timestamp Check (Final):** Double-check and ensure absolutely NO timestamps (e.g., (11:42)) remain in the final text. The output must be a clean narrative.
+
+**Output:**
+Return ONLY the fully edited and polished text. Do not add any commentary or explanations.
+`;
+            
+            const result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+            if (!result.success) throw new Error(result.error || 'AI generation failed');
+            
+            setModuleState(prev => ({ 
+                ...prev, 
+                quick: { 
+                    ...prev.quick, 
+                    rewrittenText: result.text || '', 
+                    hasBeenEdited: true,
+                    loadingMessage: 'Biên tập tự động hoàn tất!'
+                } 
+            }));
+            
+        } catch (e) {
+            console.error('Auto edit error:', e);
+            updateStateInput({ 
+                loadingMessage: 'Lỗi biên tập tự động, nhưng văn bản đã viết lại thành công!',
+                editError: `Lỗi biên tập tự động: ${(e as Error).message}` 
+            });
         }
     };
 
