@@ -137,7 +137,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       console.log('Key:', currentKey);
       console.log('Credit amount:', creditAmount);
       console.log('Package price:', pkg.price);
-      console.log('Payment API URL:', `${PAYMENT_API_URL}/api/payment/create`);
+      console.log('Payment API URL:', `${PAYMENT_API_URL}/payment/create`);
       
       // Thử các format khác nhau cho backend
       console.log('Trying different payload formats...');
@@ -164,7 +164,7 @@ const RechargeModule: React.FC<{ currentKey: string }> = ({ currentKey }) => {
       for (let i = 0; i < payloads.length; i++) {
         try {
           console.log(`Attempt ${i + 1} with payload:`, payloads[i]);
-          res = await axios.post(`${PAYMENT_API_URL}/api/payment/create`, payloads[i]);
+          res = await axios.post(`${PAYMENT_API_URL}/payment/create`, payloads[i]);
           console.log(`Attempt ${i + 1} succeeded!`);
           break;
         } catch (err) {
