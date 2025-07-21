@@ -162,7 +162,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
               \n    - **If Target Language Differs from Source Language AND Rewrite Level < 75%:** For each character, you MUST choose ONE consistent form in \`${selectedTargetLangLabel}\` (either a standard direct translation or the original name if more appropriate phonetically) upon their first appearance in the rewritten text, AND THEN USE THAT CHOSEN FORM WITH ABSOLUTE CONSISTENCY. No random variations.
               \n    - **(Specific rules for Character Map at Level >= 75% are detailed below).**`;
 
-      const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.
+      let prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.
 
 **Instructions:**
 - **Source Language:** ${selectedSourceLangLabel}
