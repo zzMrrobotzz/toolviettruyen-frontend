@@ -6,6 +6,9 @@ export interface AIRequest {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  systemInstruction?: string;
+  useGoogleSearch?: boolean;
+  options?: any;
 }
 
 export interface AIResponse {
@@ -56,10 +59,15 @@ export const generateText = async (
 ): Promise<{ text: string }> => {
   const request: AIRequest = {
     prompt,
+    systemInstruction,
     provider: apiSettings?.provider || 'gemini',
     model: apiSettings?.model,
     temperature: apiSettings?.temperature,
-    maxTokens: apiSettings?.maxTokens
+    maxTokens: apiSettings?.maxTokens,
+    useGoogleSearch: false,
+    options: {
+      useJsonOutput
+    }
   };
 
   const result = await generateTextViaBackend(request, (newCredit) => {
@@ -81,10 +89,15 @@ export const generateTextWithJsonOutput = async <T,>(
 ): Promise<T> => {
   const request: AIRequest = {
     prompt,
+    systemInstruction,
     provider: apiSettings?.provider || 'gemini',
     model: apiSettings?.model,
     temperature: apiSettings?.temperature,
-    maxTokens: apiSettings?.maxTokens
+    maxTokens: apiSettings?.maxTokens,
+    useGoogleSearch: false,
+    options: {
+      useJsonOutput: true
+    }
   };
 
   const result = await generateTextViaBackend(request, (newCredit) => {
