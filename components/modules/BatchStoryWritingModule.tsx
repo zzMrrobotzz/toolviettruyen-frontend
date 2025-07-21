@@ -1,6 +1,6 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     ApiSettings, 
     BatchStoryWritingModuleState, 
@@ -17,9 +17,11 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryViewer from '../HistoryViewer';
 import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
+import { addToHistory, getModuleHistory } from '../../utils/historyManager';
 
 interface BatchStoryWritingModuleProps {
   apiSettings: ApiSettings;
@@ -36,6 +38,16 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     outputLanguage, referenceViralStoryForStyle, isProcessingBatch,
     batchProgressMessage, batchError, concurrencyLimit
   } = moduleState;
+
+  // History management
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyCount, setHistoryCount] = useState(0);
+
+  // Update history count when component mounts
+  useEffect(() => {
+    const history = getModuleHistory('batch-story');
+    setHistoryCount(history.length);
+  }, [showHistory]);
 
   const updateState = (updates: Partial<BatchStoryWritingModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
@@ -259,6 +271,20 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     
     const analysisResult = await jsonGenerator<EditStoryAnalysisReport>(analysisPrompt);
 
+    // Save to history after successful completion
+    if (editedStory && editedStory.trim()) {
+        addToHistory('batch-story', editedStory.trim(), {
+            originalText: item.originalOutline,
+            settings: {
+                targetLength: item.specificTargetLength ?? globalTargetLength,
+                writingStyle: item.specificWritingStyle ?? globalWritingStyle,
+                customWritingStyle: item.specificCustomWritingStyle ?? globalCustomWritingStyle,
+                outputLanguage,
+                referenceViralStoryForStyle
+            }
+        });
+    }
+
     return { 
         generatedStory: editedStory, 
         postEditAnalysis: analysisResult, 
@@ -347,6 +373,11 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
         isProcessingBatch: false, 
         batchProgressMessage: `Hoàn thành xử lý toàn bộ ${validItems.length} truyện.` 
     });
+    
+    // Update history count after batch completion
+    const history = getModuleHistory('batch-story');
+    setHistoryCount(history.length);
+    
     setTimeout(() => updateState({ batchProgressMessage: null }), 5000);
   };
   
@@ -363,16 +394,27 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
 
 
   return (
+    <>
     <ModuleContainer title="📚 Viết Truyện Hàng Loạt">
       <InfoBox>
-        <p><strong>💡 Hướng dẫn:</strong></p>
-        <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-sm">
-          <li>Thiết lập các tùy chọn chung như độ dài, phong cách viết, ngôn ngữ và truyện viral tham khảo (nếu có).</li>
-          <li><strong>(Mới)</strong> Tùy chỉnh "Số luồng xử lý đồng thời" để tăng tốc độ. Mức khuyến nghị là 3 để đảm bảo ổn định.</li>
-          <li>Thêm từng dàn ý truyện vào danh sách. Bạn có thể tùy chỉnh độ dài và phong cách riêng cho mỗi dàn ý nếu muốn.</li>
-          <li>Nhấn "Bắt Đầu Viết Hàng Loạt". AI sẽ tự động viết, biên tập và phân tích từng truyện theo số luồng bạn đã chọn.</li>
-          <li>Sau khi hoàn tất, bạn có thể xem lại, sao chép từng truyện và báo cáo phân tích của nó.</li>
-        </ul>
+        <div className="flex justify-between items-start">
+          <div>
+            <p><strong>💡 Hướng dẫn:</strong></p>
+            <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-sm">
+              <li>Thiết lập các tùy chọn chung như độ dài, phong cách viết, ngôn ngữ và truyện viral tham khảo (nếu có).</li>
+              <li><strong>(Mới)</strong> Tùy chỉnh "Số luồng xử lý đồng thời" để tăng tốc độ. Mức khuyến nghị là 3 để đảm bảo ổn định.</li>
+              <li>Thêm từng dàn ý truyện vào danh sách. Bạn có thể tùy chỉnh độ dài và phong cách riêng cho mỗi dàn ý nếu muốn.</li>
+              <li>Nhấn "Bắt Đầu Viết Hàng Loạt". AI sẽ tự động viết, biên tập và phân tích từng truyện theo số luồng bạn đã chọn.</li>
+              <li>Sau khi hoàn tất, bạn có thể xem lại, sao chép từng truyện và báo cáo phân tích của nó.</li>
+            </ul>
+          </div>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="ml-4 px-3 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap"
+          >
+            📚 Lịch sử ({historyCount}/5)
+          </button>
+        </div>
       </InfoBox>
 
       {/* Global Settings */}
@@ -537,6 +579,14 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
         </div>
       )}
     </ModuleContainer>
+    
+    {/* History Viewer */}
+    <HistoryViewer
+      module="batch-story"
+      isOpen={showHistory}
+      onClose={() => setShowHistory(false)}
+    />
+    </>
   );
 };
 

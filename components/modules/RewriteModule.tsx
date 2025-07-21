@@ -1,6 +1,6 @@
 
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
     ApiSettings, 
     RewriteModuleState
@@ -10,9 +10,11 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryViewer from '../HistoryViewer';
 import { useAppContext } from '../../AppContext';
 import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils';
+import { addToHistory, getModuleHistory } from '../../utils/historyManager';
 
 interface RewriteModuleProps {
   apiSettings: ApiSettings;
@@ -28,12 +30,22 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         isEditing, editError, editLoadingMessage, hasBeenEdited, translation
     } = moduleState.quick;
 
+    // History management
+    const [showHistory, setShowHistory] = useState(false);
+    const [historyCount, setHistoryCount] = useState(0);
+
     // Helper: updateStateInput chỉ update các trường input, không động vào rewrittenText
     const updateStateInput = (updates: Partial<Omit<typeof moduleState.quick, 'rewrittenText'>>) => {
         setModuleState(prev => ({ ...prev, quick: { ...prev.quick, ...updates } }));
     };
 
     const { consumeCredit } = useAppContext();
+
+    // Update history count when component mounts
+    useEffect(() => {
+        const history = getModuleHistory('rewrite');
+        setHistoryCount(history.length);
+    }, [showHistory]);
 
     useEffect(() => {
         if (targetLanguage !== sourceLanguage) {
@@ -216,6 +228,24 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
             
             // Tự động biên tập để đảm bảo tính nhất quán
             await autoEditAfterRewrite(fullRewrittenText.trim());
+            
+            // Save to history after successful completion
+            if (fullRewrittenText.trim()) {
+                addToHistory('rewrite', fullRewrittenText.trim(), {
+                    originalText: originalText,
+                    settings: {
+                        rewriteLevel,
+                        sourceLanguage,
+                        targetLanguage,
+                        rewriteStyle,
+                        customRewriteStyle,
+                        adaptContext
+                    }
+                });
+                // Update history count
+                const history = getModuleHistory('rewrite');
+                setHistoryCount(history.length);
+            }
         } catch (e) {
             updateStateInput({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
         } finally {
@@ -414,10 +444,21 @@ ${rewrittenText}
     const getCurrentLevelDescription = () => userLevelDescriptions[Math.round(rewriteLevel / 25) * 25];
 
     return (
+        <>
         <ModuleContainer title="🔄 Viết Lại Nhanh">
              <div className="space-y-6 animate-fadeIn">
                 <InfoBox>
-                    <strong>Viết Lại Nhanh.</strong> Sử dụng thanh trượt để điều chỉnh mức độ thay đổi từ chỉnh sửa nhẹ đến sáng tạo hoàn toàn. Lý tưởng cho các tác vụ viết lại nhanh chóng.
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <strong>Viết Lại Nhanh.</strong> Sử dụng thanh trượt để điều chỉnh mức độ thay đổi từ chỉnh sửa nhẹ đến sáng tạo hoàn toàn. Lý tưởng cho các tác vụ viết lại nhanh chóng.
+                        </div>
+                        <button
+                            onClick={() => setShowHistory(true)}
+                            className="ml-4 px-3 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-sm rounded-lg transition-colors flex items-center gap-1"
+                        >
+                            📚 Lịch sử ({historyCount}/5)
+                        </button>
+                    </div>
                 </InfoBox>
                 
                 <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow">
@@ -481,6 +522,14 @@ ${rewrittenText}
                 )}
             </div>
         </ModuleContainer>
+        
+        {/* History Viewer */}
+        <HistoryViewer
+            module="rewrite"
+            isOpen={showHistory}
+            onClose={() => setShowHistory(false)}
+        />
+        </>
     );
 };
 

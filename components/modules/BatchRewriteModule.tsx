@@ -16,9 +16,11 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryViewer from '../HistoryViewer';
 import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
+import { addToHistory, getModuleHistory } from '../../utils/historyManager';
 
 interface BatchRewriteModuleProps {
   apiSettings: ApiSettings;
@@ -32,6 +34,10 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     globalRewriteStyle, globalCustomRewriteStyle, globalAdaptContext,
     isProcessingBatch, batchProgressMessage, batchError, concurrencyLimit
   } = moduleState;
+
+  // History management
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyCount, setHistoryCount] = useState(0);
 
   const updateState = (updates: Partial<BatchRewriteModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
@@ -56,6 +62,11 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
 
   const { consumeCredit } = useAppContext();
 
+  // Update history count when component mounts
+  useEffect(() => {
+    const history = getModuleHistory('batch-rewrite');
+    setHistoryCount(history.length);
+  }, [showHistory]);
 
   // Sync globalAdaptContext based on global languages
   useEffect(() => {
@@ -389,6 +400,20 @@ ${textToEdit}
         characterMap: characterMapUsed
       });
 
+      // Save to history after successful completion
+      if (finalRewrittenText.trim()) {
+        addToHistory('batch-rewrite', finalRewrittenText.trim(), {
+          originalText: item.originalText,
+          settings: {
+            effectiveRewriteLevel,
+            effectiveSourceLanguage,
+            effectiveTargetLanguage,
+            effectiveRewriteStyleForPrompt,
+            effectiveAdaptContext
+          }
+        });
+      }
+
     } catch (e) {
       updateResultCallback(item.id, { 
         status: 'error', 
@@ -482,6 +507,11 @@ ${textToEdit}
         isProcessingBatch: false, 
         batchProgressMessage: `Hoàn thành xử lý toàn bộ ${validItems.length} mục.` 
     }));
+    
+    // Update history count after batch completion
+    const history = getModuleHistory('batch-rewrite');
+    setHistoryCount(history.length);
+    
     setTimeout(() => updateState({ batchProgressMessage: null }), 5000);
   };
   
@@ -612,15 +642,26 @@ ${textToEdit}
   }
 
   return (
+    <>
     <ModuleContainer title="🔀 Viết Lại Hàng Loạt">
       <InfoBox>
-        <p><strong>💡 Hướng dẫn:</strong></p>
-        <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-sm">
-          <li>Thiết lập các tùy chọn viết lại chung (mức độ, ngôn ngữ, phong cách).</li>
-          <li>Thêm từng đoạn văn bản bạn muốn viết lại. Bạn có thể tùy chỉnh các thiết lập riêng cho từng mục nếu muốn ghi đè cài đặt chung.</li>
-          <li>Nhấn "Bắt Đầu Viết Lại Hàng Loạt". AI sẽ xử lý từng mục, bao gồm cả bước viết lại ban đầu và bước tinh chỉnh logic/nhất quán sau đó.</li>
-          <li>Sau khi hoàn tất, bạn có thể xem lại, sao chép từng kết quả. Mỗi mục cũng sẽ có nút "Tinh Chỉnh Lại" riêng nếu bạn muốn AI xử lý lại bước tinh chỉnh cho mục đó.</li>
-        </ul>
+        <div className="flex justify-between items-start">
+          <div>
+            <p><strong>💡 Hướng dẫn:</strong></p>
+            <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-sm">
+              <li>Thiết lập các tùy chọn viết lại chung (mức độ, ngôn ngữ, phong cách).</li>
+              <li>Thêm từng đoạn văn bản bạn muốn viết lại. Bạn có thể tùy chỉnh các thiết lập riêng cho từng mục nếu muốn ghi đè cài đặt chung.</li>
+              <li>Nhấn "Bắt Đầu Viết Lại Hàng Loạt". AI sẽ xử lý từng mục, bao gồm cả bước viết lại ban đầu và bước tinh chỉnh logic/nhất quán sau đó.</li>
+              <li>Sau khi hoàn tất, bạn có thể xem lại, sao chép từng kết quả. Mỗi mục cũng sẽ có nút "Tinh Chỉnh Lại" riêng nếu bạn muốn AI xử lý lại bước tinh chỉnh cho mục đó.</li>
+            </ul>
+          </div>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="ml-4 px-3 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap"
+          >
+            📚 Lịch sử ({historyCount}/5)
+          </button>
+        </div>
       </InfoBox>
 
       {/* Global Settings */}
@@ -817,6 +858,14 @@ ${textToEdit}
         </div>
       )}
     </ModuleContainer>
+    
+    {/* History Viewer */}
+    <HistoryViewer
+      module="batch-rewrite"
+      isOpen={showHistory}
+      onClose={() => setShowHistory(false)}
+    />
+    </>
   );
 };
 

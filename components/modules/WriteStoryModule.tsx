@@ -10,10 +10,12 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
+import HistoryViewer from '../HistoryViewer';
 import { generateTextViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils'; // Added delay import
 import { Languages } from 'lucide-react';
 import { useAppContext } from '../../AppContext';
+import { addToHistory, getModuleHistory } from '../../utils/historyManager';
 
 interface WriteStoryModuleProps {
   apiSettings: ApiSettings;
@@ -67,6 +69,16 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
   const [isSingleOutlineExpanded, setIsSingleOutlineExpanded] = useState(true);
   const [currentAbortController, setCurrentAbortController] = useState<AbortController | null>(null);
   const { consumeCredit } = useAppContext();
+
+  // History management
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyCount, setHistoryCount] = useState(0);
+
+  // Update history count when component mounts
+  useEffect(() => {
+    const history = getModuleHistory('write-story');
+    setHistoryCount(history.length);
+  }, [showHistory]);
 
 
   const updateState = (updates: Partial<WriteStoryModuleState>) => {
@@ -405,6 +417,23 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         singleStoryEditProgress: 100,
         hasSingleStoryBeenEditedSuccessfully: true
       });
+
+      // Save to history after successful story completion
+      if (text && text.trim()) {
+        addToHistory('write-story', text.trim(), {
+          originalText: storyOutline,
+          settings: {
+            targetLength,
+            writingStyle,
+            customWritingStyle,
+            outputLanguage,
+            referenceViralStoryForStyle
+          }
+        });
+        // Update history count
+        const history = getModuleHistory('write-story');
+        setHistoryCount(history.length);
+      }
     } catch (e: any) {
       if (e.name === 'AbortError') {
          updateState({ storyError: 'Biên tập truyện đã bị hủy.', storyLoadingMessage: 'Đã hủy biên tập.', singleStoryEditProgress: null, hasSingleStoryBeenEditedSuccessfully: false });
@@ -598,9 +627,12 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
 
 
   return (
+    <>
     <ModuleContainer title="✍️ Module: Viết Truyện, Hook & Bài Học">
         <InfoBox>
-            <p><strong>📌 Quy trình Tạo Truyện Hoàn Chỉnh:</strong></p>
+            <div className="flex justify-between items-start">
+                <div>
+                    <p><strong>📌 Quy trình Tạo Truyện Hoàn Chỉnh:</strong></p>
             <ol className="list-decimal list-inside space-y-1.5 text-sm mt-2">
                 <li>
                     <strong>Cài đặt chung:</strong> Đầu tiên, hãy thiết lập các tùy chọn trong phần "Cài đặt chung" (Độ dài, Phong cách viết, Ngôn ngữ, và đặc biệt là khu vực Phân Tích ADN Viral). Các cài đặt này sẽ áp dụng cho các tab tương ứng.
@@ -628,6 +660,14 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
             <p className="mt-2 text-sm text-orange-600">
                 <strong>Cập nhật (QUAN TRỌNG):</strong> Khả năng giữ tính nhất quán cho tên nhân vật, địa điểm và kiểm soát độ dài truyện (±10% mục tiêu) đã được cải thiện thông qua quy trình biên tập tự động sau khi viết. Thông báo biên tập 100% sẽ hiển thị rõ ràng.
             </p>
+                </div>
+                <button
+                    onClick={() => setShowHistory(true)}
+                    className="ml-4 px-3 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-sm rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap"
+                >
+                    📚 Lịch sử ({historyCount}/5)
+                </button>
+            </div>
         </InfoBox>
 
       <div className="space-y-6 p-6 border-2 border-gray-200 rounded-lg bg-gray-50 shadow mb-8">
@@ -946,6 +986,14 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       )}
       
     </ModuleContainer>
+    
+    {/* History Viewer */}
+    <HistoryViewer
+      module="write-story"
+      isOpen={showHistory}
+      onClose={() => setShowHistory(false)}
+    />
+    </>
   );
 };
 
