@@ -289,32 +289,39 @@ ${textToEdit}
     - Loại bỏ các đoạn văn, câu chữ bị lặp lại không cần thiết.
     - Cải thiện sự mượt mà, trôi chảy giữa các câu và đoạn văn.
 
-**ĐẦU RA:**
-- Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và sửa lỗi nhất quán hoàn chỉnh.
-- Không thêm bất kỳ lời bình luận hay giải thích nào.
+**ĐẦU RA BẮT BUỘC:**
+- Trả về TOÀN BỘ nội dung văn bản đã được biên tập (${textToEdit.length} ký tự) với MỌI chi tiết được bảo tồn.
+- Văn bản sau biên tập PHẢI có độ dài ít nhất ${Math.floor(textToEdit.length * 0.95)} ký tự.
+- KHÔNG được tóm tắt, cắt bỏ, hay viết "..." thay thế nội dung.
+- KHÔNG thêm bất kỳ lời bình luận hay giải thích nào.
+- CHỈ trả về văn bản hoàn chỉnh đã biên tập.
 `;
 
             // Enhanced fallback prompt to prevent content truncation
-            const fallbackEditPrompt = `You are a professional story editor. Your task is to carefully edit and improve this text while preserving its FULL length and ALL content.
+            const fallbackEditPrompt = `BẠN LÀ CHUYÊN GIA BIÊN TẬP CHUYÊN NGHIỆP. Nhiệm vụ của bạn là biên tập văn bản SAO CHO GIỮ NGUYÊN 100% NỘI DUNG VÀ ĐỘ DÀI.
 
-**ORIGINAL TEXT FOR REFERENCE:**
+**VĂN BẢN THAM KHẢO GỐC:**
 ---
 ${originalText}
 ---
 
-**TEXT TO EDIT (must maintain complete length and all details):**
+**VĂN BẢN CẦN BIÊN TẬP (${textToEdit.length} ký tự - PHẢI GIỮ NGUYÊN ĐỘ DÀI NÀY):**
 ---
 ${textToEdit}
 ---
 
-**CRITICAL EDITING REQUIREMENTS:**
-1. **PRESERVE COMPLETE LENGTH**: The edited version MUST be approximately the same length as the input text. Do NOT shorten, summarize, or truncate any part.
-2. **KEEP ALL SCENES AND DIALOGUE**: Maintain every scene, conversation, and narrative element from the text being edited.
-3. **CHARACTER CONSISTENCY**: Ensure all character names remain consistent throughout the entire text.
-4. **PLOT COHERENCE**: Fix any logical contradictions while keeping all story elements intact.
-5. **LANGUAGE IMPROVEMENT**: Enhance grammar, flow, and readability without changing the content or length.
+**YÊU CẦU BIÊN TẬP NGHIÊM NGẶT:**
+1. **KHÔNG ĐƯỢC CẮT BỎ HOẶC TÓM TẮT**: Văn bản sau biên tập PHẢI có độ dài ít nhất ${Math.floor(textToEdit.length * 0.95)} ký tự.
+2. **GIỮ TẤT CẢ CẢNH VÀ ĐỐI THOẠI**: Mọi cảnh quay, cuộc hội thoại, chi tiết miêu tả đều PHẢI được giữ nguyên.
+3. **THỐNG NHẤT TÊN NHÂN VẬT**: Đảm bảo mỗi nhân vật chỉ dùng MỘT TÊN duy nhất trong toàn bộ văn bản.
+4. **LOGIC CỐT TRUYỆN**: Sửa các mâu thuẫn logic nhưng KHÔNG được xóa bất kỳ sự kiện nào.
+5. **CẢI THIỆN VĂN PHONG**: Chỉ sửa ngữ pháp, cách diễn đạt mà KHÔNG thay đổi nội dung.
 
-**ABSOLUTE REQUIREMENT**: Return the COMPLETE edited text with all original content preserved. The output must be as detailed and lengthy as the input text - do not cut anything out.`;
+**LƯU Ý TUYỆT ĐỐI**: 
+- Trả về TOÀN BỘ văn bản đã biên tập với mọi chi tiết được bảo tồn.
+- Độ dài văn bản sau biên tập PHẢI tương đương với văn bản cần biên tập (${textToEdit.length} ký tự).
+- KHÔNG được viết phản hồi kiểu "Tôi cần thêm thông tin" hay "Bạn có thể cung cấp".
+- CHỈ trả về văn bản đã được biên tập hoàn chỉnh.`;
 
             let result;
             try {
@@ -364,15 +371,44 @@ ${textToEdit}
             
             if (!result.success) throw new Error(result.error || 'AI generation failed');
             
-            setModuleState(prev => ({ 
-                ...prev, 
-                quick: { 
-                    ...prev.quick, 
-                    rewrittenText: result.text || '', 
-                    hasBeenEdited: true,
-                    loadingMessage: 'Biên tập tự động hoàn tất!'
-                } 
-            }));
+            // ✅ CRITICAL FIX: Kiểm tra chất lượng biên tập trước khi ghi đè
+            const editedText = result.text || '';
+            const originalLength = textToEdit.length;
+            const editedLength = editedText.length;
+            const lengthRatio = editedLength / originalLength;
+            
+            // Chỉ áp dụng biên tập nếu:
+            // 1. Độ dài tương đối (ít nhất 70% độ dài gốc)
+            // 2. Không phải là phản hồi generic/ngắn
+            const isValidEdit = lengthRatio >= 0.7 && 
+                               editedLength > 100 && 
+                               !editedText.includes('I need more specific') &&
+                               !editedText.includes('Please provide') &&
+                               !editedText.toLowerCase().includes('summarize') &&
+                               !editedText.toLowerCase().includes('không thể');
+            
+            if (isValidEdit) {
+                console.log(`✅ Auto-edit successful: ${originalLength} → ${editedLength} chars (${(lengthRatio * 100).toFixed(1)}%)`);
+                setModuleState(prev => ({ 
+                    ...prev, 
+                    quick: { 
+                        ...prev.quick, 
+                        rewrittenText: editedText,
+                        hasBeenEdited: true,
+                        loadingMessage: 'Biên tập tự động hoàn tất!'
+                    } 
+                }));
+            } else {
+                console.warn(`⚠️ Auto-edit quality check failed: ${originalLength} → ${editedLength} chars (${(lengthRatio * 100).toFixed(1)}%). Keeping original rewrite.`);
+                setModuleState(prev => ({ 
+                    ...prev, 
+                    quick: { 
+                        ...prev.quick, 
+                        hasBeenEdited: false, // Mark as NOT edited since we rejected the edit
+                        loadingMessage: 'Biên tập tự động không đạt chất lượng, giữ nguyên văn bản viết lại!'
+                    } 
+                }));
+            }
             
         } catch (e) {
             console.error('❌ Auto edit completely failed:', e);
@@ -420,9 +456,12 @@ ${rewrittenText}
     - Loại bỏ các đoạn văn, câu chữ bị lặp lại không cần thiết.
     - Cải thiện sự mượt mà, trôi chảy giữa các câu và đoạn văn.
 
-**ĐẦU RA:**
-- Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và sửa lỗi nhất quán hoàn chỉnh.
-- Không thêm bất kỳ lời bình luận hay giải thích nào.
+**ĐẦU RA BẮT BUỘC:**
+- Trả về TOÀN BỘ nội dung văn bản đã được biên tập (${textToEdit.length} ký tự) với MỌI chi tiết được bảo tồn.
+- Văn bản sau biên tập PHẢI có độ dài ít nhất ${Math.floor(textToEdit.length * 0.95)} ký tự.
+- KHÔNG được tóm tắt, cắt bỏ, hay viết "..." thay thế nội dung.
+- KHÔNG thêm bất kỳ lời bình luận hay giải thích nào.
+- CHỈ trả về văn bản hoàn chỉnh đã biên tập.
 `;
         
         try {
