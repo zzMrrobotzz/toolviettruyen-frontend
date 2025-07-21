@@ -53,8 +53,9 @@ const NicheThemeExplorerModule: React.FC<NicheThemeExplorerModuleProps> = ({
         analysisResults: [] 
     });
 
-    const selectedInputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === inputLanguage)?.label || inputLanguage;
-    const selectedOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const selectedInputLangLabel = inputLanguage;
+    const selectedOutputLangLabel = outputLanguage;
 
     const prompt = `
 You are an AI expert in content strategy and niche theme identification.

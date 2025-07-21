@@ -101,7 +101,8 @@ const EditStoryModule: React.FC<EditStoryModuleProps> = ({ apiSettings, moduleSt
     const editingLoadingMessageInitial = `Bước 1/2: AI đang biên tập truyện (hiện tại ~${estimatedCurrentWordCount} từ, mục tiêu ${minLength}-${maxLength} từ)...`;
     updateProgressCallback(editingLoadingMessageInitial);
     
-    const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentLanguage)?.label || currentLanguage;
+    // Use the actual language value for AI consistency
+    const outputLanguageLabel = currentLanguage;
     
     const editPrompt = `Bạn là một biên tập viên truyện chuyên nghiệp và một nhà văn AI bậc thầy, cực kỳ tỉ mỉ và có khả năng tinh chỉnh văn phong xuất sắc. Nhiệm vụ của bạn là biên tập lại toàn bộ "Truyện Gốc" dưới đây để đáp ứng các yêu cầu sau:
 
@@ -233,7 +234,8 @@ CHỈ TRẢ VỀ JSON.`;
       return;
     }
     updateState({ isRefiningFurther: true, furtherRefinementError: null });
-    const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === languageForEditing)?.label || languageForEditing;
+    // Use the actual language value for AI consistency
+    const outputLanguageLabel = languageForEditing;
 
     const prompt = `Bạn là một biên tập viên AI chuyên nghiệp. Dưới đây là một câu chuyện đã được biên tập.
     **Câu chuyện hiện tại (bằng ${outputLanguageLabel}):**

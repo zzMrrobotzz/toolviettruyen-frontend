@@ -59,7 +59,8 @@ const Dream100CompetitorAnalysisModule: React.FC<Dream100CompetitorAnalysisModul
       groundingSources: []
     });
 
-    const selectedOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const selectedOutputLangLabel = outputLanguage;
 
     let advancedSearchInstructions = "";
     if (searchForNewChannels) {

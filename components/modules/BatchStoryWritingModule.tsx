@@ -144,7 +144,8 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
         currentWritingStyle = WRITING_STYLE_OPTIONS.find(opt => opt.value === 'custom')?.label || 'Tùy chỉnh'; 
     }
     
-    const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const outputLanguageLabel = outputLanguage;
 
     // --- Part 1: Story Generation ---
     updateItemProgress({ status: 'writing', progressMessage: 'Đang viết truyện...' });

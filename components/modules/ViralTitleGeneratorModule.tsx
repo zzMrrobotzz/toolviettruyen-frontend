@@ -37,7 +37,8 @@ const ContentStrategyModule: React.FC<ContentStrategyModuleProps> = ({ apiSettin
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
-  const getSelectedLanguageLabel = (langValue: string) => HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === langValue)?.label || langValue;
+  // Use the actual language value for AI consistency
+  const getSelectedLanguageLabel = (langValue: string) => langValue;
 
   const handleCreationStudioSubmit = async () => {
     let currentLoadingMessageGeneral = "Đang xử lý yêu cầu...";

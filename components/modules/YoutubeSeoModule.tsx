@@ -48,7 +48,8 @@ const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, module
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
-  const getSelectedLanguageLabel = () => HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === language)?.label || language;
+  // Use the actual language value for AI consistency
+  const getSelectedLanguageLabel = () => language;
   const handleGenerateDescription = async () => {
     if (!videoTitle.trim()) { updateState({ error: 'Vui lòng nhập tiêu đề video!' }); return; }
     if (!youtubeOutline.trim()) { updateState({ error: 'Vui lòng nhập dàn ý để tạo timeline!' }); return; }

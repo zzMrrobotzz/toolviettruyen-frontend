@@ -52,7 +52,8 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
       referenceOutlineAnalysisResult: null 
     });
 
-    const selectedOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const selectedOutputLangLabel = outputLanguage;
 
     const prompt = `Bạn là một chuyên gia phân tích cấu trúc truyện. Hãy phân tích kỹ "Dàn Ý Tham Khảo" dưới đây và đưa ra nhận xét chi tiết về cấu trúc, điểm mạnh, và các kỹ thuật kể chuyện được sử dụng.
     Phân tích của bạn nên tập trung vào:
@@ -105,7 +106,8 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
         currentPlotStructureInfo = selectedPlotStructureObj.label; // Send the label to AI for non-custom
     }
     
-    const selectedOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const selectedOutputLangLabel = outputLanguage;
 
     const prompt = `Bạn là một chuyên gia sáng tạo dàn ý truyện. Hãy tạo ra một dàn ý truyện hấp dẫn và lôi cuốn dựa trên các thông tin sau.
     Dàn ý cuối cùng PHẢI được viết bằng "Ngôn ngữ Hiện thị Kết quả" (${selectedOutputLangLabel}).
@@ -149,8 +151,9 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
         currentPlotStructureInfo = selectedPlotStructureObj.label; // Send the label
     }
     
-    const selectedIdeaLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === ideaLanguage)?.label || ideaLanguage;
-    const selectedOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const selectedIdeaLangLabel = ideaLanguage;
+    const selectedOutputLangLabel = outputLanguage;
     const selectedDetailLabel = OUTLINE_DETAIL_LEVEL_OPTIONS.find(opt => opt.value === outlineDetailLevel)?.label || outlineDetailLevel;
 
     let referenceOutlinePromptSegment = '';
@@ -245,8 +248,9 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
         currentPlotStructureInfo = selectedPlotStructureObj.label; // Send label
     }
     
-    const selectedIdeaLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === ideaLanguage)?.label || ideaLanguage;
-    const selectedOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const selectedIdeaLangLabel = ideaLanguage;
+    const selectedOutputLangLabel = outputLanguage;
     const selectedDetailLabel = OUTLINE_DETAIL_LEVEL_OPTIONS.find(opt => opt.value === outlineDetailLevel)?.label || outlineDetailLevel;
     
     let referenceOutlinePromptSegment = '';

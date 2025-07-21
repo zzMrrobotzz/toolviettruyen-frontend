@@ -85,8 +85,9 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
         });
     }
 
-    const selectedInputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === inputLanguage)?.label || inputLanguage;
-    const selectedOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const selectedInputLangLabel = inputLanguage;
+    const selectedOutputLangLabel = outputLanguage;
 
     const systemInstruction = `You are an AI expert specializing in creating vivid and detailed character visual descriptions for AI image generation. Your goal is to generate a "Base Character Prompt" that, when used repeatedly, helps an image AI maintain the character's core visual identity, especially facial features, across different scenes and actions.`;
     
@@ -201,8 +202,9 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
         generatedCompleteImagePrompt: '' 
     });
 
-    const selectedActionInputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === inputLanguage)?.label || inputLanguage; // Language of characterAction
-    const selectedFinalOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage; // Language of generatedBaseCharacterPrompt AND final prompt
+    // Use the actual language value for AI consistency
+    const selectedActionInputLangLabel = inputLanguage; // Language of characterAction
+    const selectedFinalOutputLangLabel = outputLanguage; // Language of generatedBaseCharacterPrompt AND final prompt
 
     const systemInstruction = `You are an AI assistant that combines a base character description with a specific action/scene to create a complete and effective image generation prompt.`;
     

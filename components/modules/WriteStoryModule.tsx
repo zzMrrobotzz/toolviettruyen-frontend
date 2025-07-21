@@ -156,7 +156,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     updateState({ hookError: null, generatedHooks: '', hookLoadingMessage: 'Đang tạo hooks...' });
     
     let ctaInstructionSegment = ctaChannel.trim() ? `\n- If a Call To Action (CTA) is appropriate for the chosen hook structure (e.g., as part of 'Action' in AIDA, or at the end), incorporate a compelling CTA to like, comment, and subscribe to the channel "${ctaChannel.trim()}".` : "";
-    const selectedHookLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === hookLanguage)?.label || hookLanguage;
+    // Use the actual language value for AI consistency
+    const selectedHookLangLabel = hookLanguage;
 
     let structureInstructionSegment = '';
     let structuralExplanationRequirement = '';
@@ -237,7 +238,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     const currentTargetLengthNum = parseInt(targetLength);
     const numChunks = Math.ceil(currentTargetLengthNum / CHUNK_WORD_COUNT);
     let fullStory = '';
-    const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const outputLanguageLabel = outputLanguage;
     
     let referenceStoryStylePromptSegment = '';
     if (referenceViralStoryForStyle?.trim()) {
@@ -370,7 +372,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         storyError: null // Clear previous story errors
     });
     
-    const outputLanguageLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
+    // Use the actual language value for AI consistency
+    const outputLanguageLabel = outputLanguage;
     
     let prompt = `Bạn là một biên tập viên truyện chuyên nghiệp. Nhiệm vụ của bạn là biên tập lại toàn bộ "Truyện Gốc" dưới đây để đáp ứng các yêu cầu sau:
     \n**YÊU CẦU QUAN TRỌNG NHẤT VÀ ĐẦU TIÊN: ĐỘ DÀI CUỐI CÙNG CỦA TRUYỆN SAU KHI BIÊN TẬP PHẢI nằm trong khoảng từ ${minLength} đến ${maxLength} từ. MỤC TIÊU LÝ TƯỞNG là khoảng ${currentTargetLengthNum} từ.**
