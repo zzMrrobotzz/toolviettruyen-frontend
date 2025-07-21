@@ -149,11 +149,11 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
         rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${currentRewriteStyleSettingValue}.`;
       }
       
-      const lengthFidelityInstruction = `\n- **GUIDANCE ON OUTPUT LENGTH:** Your primary task is to REWRITE according to the 'Degree of Change Required'. The rewritten chunk should generally reflect the narrative scope and detail of the original.
-    \n  - For Degree of Change 0-25%: Aim for the output length to be reasonably close (e.g., +/-15%) to the original chunk's character count. However, making the required textual changes (even if minimal) as per the degree's description is MORE IMPORTANT than strictly adhering to this length if a conflict arises. DO NOT return original text if 'Degree of Change Required' is greater than 0.
-    \n  - For Degree of Change 50%: Aim for a length within +/-25% of the original. Focus on meaningful rewriting as per the degree.
-    \n  - For Degree of Change 75-100%: Length can vary significantly based on the creative changes, but the output must be a developed narrative segment. A 100% rewrite may be shorter if it's a thematic reinterpretation.
-    \n  In all cases where 'Degree of Change Required' is greater than 0%, prioritize executing the rewrite as instructed over returning an unchanged text due to length concerns. Avoid drastic, unexplained shortening unless it's a 100% rewrite or explicitly instructed by custom rewrite instructions.`;
+      const lengthFidelityInstruction = `\n- **Output Length Requirement (CRITICAL):** Your rewritten output MUST be at least as long as the original text, preferably 10-20% longer. Maintain the same level of detail, narrative richness, and descriptive elements. Do NOT shorten or summarize the content.
+    \n  - For Degree of Change 0-25%: MUST maintain original length as minimum, with rich detail preservation.
+    \n  - For Degree of Change 50%: MUST be at least as long as original, with enhanced descriptions and narrative depth.
+    \n  - For Degree of Change 75-100%: Length should match or exceed original through creative expansion and detailed world-building.
+    \n  In all cases, NEVER return shortened content unless specifically instructed. Length and detail are paramount for quality output.`;
 
 
       let characterConsistencyInstructions = `
@@ -171,8 +171,8 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
       \n**Rewrite Instructions:**
       \n- **Source Language (of the input text):** ${selectedSourceLangLabel}
       \n- **Target Language (for the output text):** ${selectedTargetLangLabel}
-      \n- **Degree of Change Required:** ${currentRewriteLevel}%. This means you should ${levelDescription}. Ensure your changes strictly adhere to the permissions of this level (e.g., if the level states 'main character names...MUST be kept', then they MUST NOT be changed).
       ${lengthFidelityInstruction}
+      \n- **Degree of Change Required:** ${currentRewriteLevel}%. This means you should ${levelDescription}. Ensure your changes strictly adhere to the permissions of this level (e.g., if the level states 'main character names...MUST be kept', then they MUST NOT be changed).
       \n- **Rewrite Style Application:** ${rewriteStyleInstructionPromptSegment}
       \n- **Timestamp Handling:** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
       ${localizationRequest}
@@ -286,9 +286,10 @@ ${textToEdit}
     - So sánh các sự kiện chính giữa hai phiên bản. "Văn Bản Đã Viết Lại" có tạo ra "plot hole" hoặc mâu thuẫn với các sự kiện đã được thiết lập không? Sửa lại cho hợp lý.
 3.  **NHẤT QUÁN CHI TIẾT:**
     - Kiểm tra các chi tiết nhỏ nhưng quan trọng (nghề nghiệp, tuổi tác, địa điểm, mối quan hệ). Chúng có nhất quán trong toàn bộ "Văn Bản Đã Viết Lại" không?
-4.  **CẢI THIỆN VĂN PHONG:**
+4.  **CẢI THIỆN VĂN PHONG VÀ ĐỘ DÀI:**
     - Loại bỏ các đoạn văn, câu chữ bị lặp lại không cần thiết.
     - Cải thiện sự mượt mà, trôi chảy giữa các câu và đoạn văn.
+    - **QUAN TRỌNG:** Đảm bảo văn bản cuối cùng có độ dài phù hợp, không bị cắt ngắn so với bản gốc. Thêm chi tiết mô tả, đối thoại, và phát triển cảnh nếu cần thiết.
 
 **ĐẦU RA:**
 - Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và sửa lỗi nhất quán hoàn chỉnh.
@@ -358,12 +359,13 @@ ${textToEdit}
         textGenerator
       );
       
-      updateResultCallback(item.id, { rewrittenText: initiallyRewrittenText, progressMessage: 'Hoàn thành viết lại. Chuẩn bị tinh chỉnh...', characterMap: characterMapUsed });
+      updateResultCallback(item.id, { rewrittenText: initiallyRewrittenText, progressMessage: 'Hoàn thành viết lại. Đang tự động tinh chỉnh...', characterMap: characterMapUsed });
 
       if (!initiallyRewrittenText.trim()) {
         throw new Error("Văn bản viết lại ban đầu trống.");
       }
       
+      // Auto-edit after rewrite for consistency and length enhancement
       const finalRewrittenText = await performSingleItemPostEdit(
         initiallyRewrittenText,
         item.originalText,
