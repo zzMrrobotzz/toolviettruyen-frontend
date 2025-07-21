@@ -162,54 +162,54 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
               \n    - **If Target Language Differs from Source Language AND Rewrite Level < 75%:** For each character, you MUST choose ONE consistent form in \`${selectedTargetLangLabel}\` (either a standard direct translation or the original name if more appropriate phonetically) upon their first appearance in the rewritten text, AND THEN USE THAT CHOSEN FORM WITH ABSOLUTE CONSISTENCY. No random variations.
               \n    - **(Specific rules for Character Map at Level >= 75% are detailed below).**`;
 
-      let prompt = `**Primary Objective:** Your main goal is to actively REWRITE the input text chunk. The extent and nature of the rewrite are determined by the 'Degree of Change Required' and the 'Rewrite Style Application' instructions below. You MUST produce a rewritten version. Only if the 'Degree of Change Required' is 0% AND the text has absolutely no errors to fix, should you return the original text verbatim. For any other degree of change, a rewritten output is mandatory.
+      const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.
 
-      \n**CRITICAL NARRATIVE INTEGRITY (SINGLE TRUTH MANDATE):** You are rewriting ONE SINGLE STORY. All details regarding characters (names, roles, relationships, established traits), plot points, events, locations, and timelines MUST remain ABSOLUTELY CONSISTENT with what has been established in previously rewritten chunks of THIS SAME STORY (provided as \`fullRewrittenStory\` context, which is THE CANON for this session) and the initial setup of the current chunk. DO NOT introduce conflicting information or alter established facts. Maintain ONE UNIFIED AND LOGICAL NARRATIVE THREAD.
+**Instructions:**
+- **Source Language:** ${selectedSourceLangLabel}
+- **Target Language:** ${selectedTargetLangLabel}
+- **Degree of Change Required:** ${currentRewriteLevel}%. This means you should ${levelDescription}.
+- **Output Length Requirement (CRITICAL):** Your rewritten output MUST be at least as long as the original text, preferably 10-20% longer. Maintain the same level of detail, narrative richness, and descriptive elements. Do NOT shorten or summarize the content.
+- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}
+- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
+- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.
+${localizationRequest}
+${characterConsistencyInstructions}
 
-      \n**Your Task:** Rewrite the provided text chunk.
-      \n**Critical Output Requirement:** Your response for this task MUST BE ONLY the rewritten text itself, in the specified Target Language. NO other text, introductions, explanations, or meta-comments are allowed.
-      \n**Rewrite Instructions:**
-      \n- **Source Language (of the input text):** ${selectedSourceLangLabel}
-      \n- **Target Language (for the output text):** ${selectedTargetLangLabel}
-      ${lengthFidelityInstruction}
-      \n- **Degree of Change Required:** ${currentRewriteLevel}%. This means you should ${levelDescription}. Ensure your changes strictly adhere to the permissions of this level (e.g., if the level states 'main character names...MUST be kept', then they MUST NOT be changed).
-      \n- **Rewrite Style Application:** ${rewriteStyleInstructionPromptSegment}
-      \n- **Timestamp Handling:** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
-      ${localizationRequest}
-      \n- **Overall Story Coherence (CRITICAL - Builds on Narrative Integrity):**
-          \n  - **Persona Consistency:** Pay close attention to key details that define a character's persona, such as their stated years of experience, specific titles (Dr., Prof.), or recurring personal details. These details MUST be maintained with 100% consistency throughout the entire rewritten text, unless a custom instruction explicitly directs you to change them.
-          \n  - **Logical Flow:** The rewritten chunk MUST maintain logical consistency internally and with \`fullRewrittenStory\`.
-          \n  - **Character Consistency (General Behavior & Names):** ${characterConsistencyInstructions}
-          \n  - **Event, Setting & Situation Coherence:** Ensure events, locations, and plot-relevant objects are plausible and consistent with established facts (from \`fullRewrittenStory\` and the original chunk's premise), respecting the "Degree of Change". Once a setting or event detail is established in the rewrite, stick to it.
-      \n- **Context from Previous Chunks (THE CANON - must be in ${selectedTargetLangLabel}):**
-          \n  \`${fullRewrittenStory || "This is the first chunk. No previous context."}\`
-      `;
+**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**
+---
+${fullRewrittenStory || "This is the first chunk."}
+---
+
+**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**
+---
+${textChunk}
+---
+
+**Your Task:**
+Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Ensure the output is comprehensive and at least as detailed as the original. Do not include any other text, introductions, or explanations.
+`;
       
       if (i === 0 && currentRewriteLevel >= 75) {
-          prompt += ` \n\n**Character Mapping (MANDATORY for First Chunk if Level >= 75%):**
-          \nYour primary goal for character names is consistency in the ${selectedTargetLangLabel} output.
-          \nIdentify ALL character names (main, secondary, recurring) that YOU, the AI, are PURPOSEFULLY and CREATIVELY altering from their form in the ${selectedSourceLangLabel} text to a new, distinct form in your ${selectedTargetLangLabel} rewritten text for THIS CHUNK. This includes significant re-spellings, translations that are creative choices rather than direct equivalents, or entirely new names. For each such change, record it.
-          \nAt the VERY END of your entire response for THIS CHUNK, append these changes in the format:
-          \n"[CHARACTER_MAP]Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 1 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 1; Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 2 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 2[/CHARACTER_MAP]"
-          \nIf you make NO such purposeful creative changes to ANY character names (i.e., they are kept original, or receive only direct, standard translations that will be applied consistently per the general character consistency rule), you MUST append:
-          \n"[CHARACTER_MAP]Không có thay đổi tên nhân vật chính nào được map[/CHARACTER_MAP]"
-          \nThis map (or the 'no change' signal) is VITAL for consistency in subsequent chunks. This instruction and its output are ONLY for this first chunk and MUST be outside the main rewritten story text.`;
-      } else if (characterMapForItem && currentRewriteLevel >= 75) { // Use characterMapForItem here
-          prompt += `\n- **ABSOLUTE CHARACTER CONSISTENCY MANDATE (Based on Character Map for Level >= 75%):**
-          \n  You are provided with a Character Map: \`${characterMapForItem}\`. You MUST adhere to this with 100% accuracy.
-          \n  - If the map provides \`Tên Gốc (trong ${selectedSourceLangLabel}): [Tên A] -> Tên Mới (trong ${selectedTargetLangLabel}): [Tên B]\` pairs: Use the 'New Name' \`[Tên B]\` EXACTLY AS SPECIFIED for every instance (explicit or implied) of the 'Original Name' \`[Tên A]\`.
-          \n  - If the map states \`Không có thay đổi tên nhân vật chính nào được map\`: You MUST continue using the exact naming convention for ALL characters as established in the first rewritten chunk.
-          \n  - **FOR ALL CHARACTERS (mapped or not): Once a name is used for a character in the \`${selectedTargetLangLabel}\` output for this story, IT MUST NOT CHANGE for that character in subsequent parts of this same story.** DO NOT re-translate, vary, or introduce alternative names for any character already named.
-          \n  - **Handling Unmapped Names (if map exists and is not "no change"):** For ANY character name encountered in the original text that is NOT explicitly listed in the Character Map (and the map is not 'Không có thay đổi...'), you MUST: 1. Check if this character has already appeared in previously rewritten chunks (\`fullRewrittenStory\`). If yes, use the EXACT SAME name (in \`${selectedTargetLangLabel}\`) as used before. 2. If it's a new character not in the map and not seen before, apply a consistent, direct translation to \`${selectedTargetLangLabel}\` or maintain the original name if phonetically suitable, and then USE THIS CHOSEN FORM CONSISTENTLY for all future appearances of this character.`;
-      }
+          prompt += `
 
-      prompt += `\n**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**
-      \n---
-      \n${textChunk}
-      \n---
-      \n**IMPORTANT FINAL INSTRUCTION FOR THIS CHUNK:**
-      \nRegardless of the complexity or perceived difficulty of the rewrite task based on the 'Degree of Change Required' and other constraints, if 'Degree of Change Required' is greater than 0%, your output for THIS CHUNK ABSOLUTELY MUST BE A REWRITTEN VERSION. It CANNOT be an identical copy of the 'Original Text Chunk to Rewrite' provided above. Make your best effort to apply the changes as instructed. If the 'Degree of Change Required' is 0%, only fix basic spelling/grammar and return the full text; otherwise, you must rewrite.
-      \n**Perform the rewrite for THIS CHUNK ONLY in ${selectedTargetLangLabel}. Adhere strictly to all instructions. Remember, ONLY the rewritten story text.**`;
+**Character Mapping (MANDATORY for First Chunk if Level >= 75%):**
+Your primary goal for character names is consistency in the ${selectedTargetLangLabel} output.
+Identify ALL character names (main, secondary, recurring) that YOU, the AI, are PURPOSEFULLY and CREATIVELY altering from their form in the ${selectedSourceLangLabel} text to a new, distinct form in your ${selectedTargetLangLabel} rewritten text for THIS CHUNK. This includes significant re-spellings, translations that are creative choices rather than direct equivalents, or entirely new names. For each such change, record it.
+At the VERY END of your entire response for THIS CHUNK, append these changes in the format:
+"[CHARACTER_MAP]Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 1 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 1; Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 2 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 2[/CHARACTER_MAP]"
+If you make NO such purposeful creative changes to ANY character names (i.e., they are kept original, or receive only direct, standard translations that will be applied consistently per the general character consistency rule), you MUST append:
+"[CHARACTER_MAP]Không có thay đổi tên nhân vật chính nào được map[/CHARACTER_MAP]"
+This map (or the 'no change' signal) is VITAL for consistency in subsequent chunks. This instruction and its output are ONLY for this first chunk and MUST be outside the main rewritten story text.`;
+      } else if (characterMapForItem && currentRewriteLevel >= 75) {
+          prompt += `
+
+**ABSOLUTE CHARACTER CONSISTENCY MANDATE (Based on Character Map for Level >= 75%):**
+You are provided with a Character Map: \`${characterMapForItem}\`. You MUST adhere to this with 100% accuracy.
+- If the map provides \`Original -> New\` pairs: Use the 'New Name' EXACTLY AS SPECIFIED for every instance of the 'Original Name'.
+- If the map states 'Không có thay đổi...': You MUST continue using the exact naming convention for ALL characters as established in the first rewritten chunk.
+- For ANY character not in the map, you MUST maintain the name used in the first rewritten chunk.
+- **DO NOT re-translate, vary, or introduce alternative names for any character already named.**`;
+      }
 
       if (i > 0) await delay(750);
       const result = await textGenerator(prompt, systemInstructionForRewrite);
