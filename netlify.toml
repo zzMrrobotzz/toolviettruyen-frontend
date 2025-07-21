@@ -4,16 +4,12 @@
   command = "npm run build"
   publish = "dist"
 
-# Cấu hình chuyển hướng (proxy) cho các API call
+# Proxy configuration for backend API calls
 [[redirects]]
-  # Bất kỳ request nào bắt đầu bằng /api/
   from = "/api/*"
-  
-  # Sẽ được chuyển hướng đến backend server của bạn
-  to = "https://key-manager-backend.onrender.com/:splat"
-  
-  # Status 200 để làm proxy, không phải redirect
+  to = "https://key-manager-backend.onrender.com/api/:splat"
   status = 200
+  force = true
 
 # Quy tắc này đảm bảo routing phía client của React hoạt động
 [[redirects]]
