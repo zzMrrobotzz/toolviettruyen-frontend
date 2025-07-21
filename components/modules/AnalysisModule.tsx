@@ -5,7 +5,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateAiContent } from '../../src/services/keyService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { useAppContext } from '../../AppContext';
 
 interface AnalysisModuleProps {
@@ -62,7 +62,8 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
     \n---`;
 
     try {
-      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      const request = { prompt, provider: 'gemini' };
+      const result = await generateTextViaBackend(request, (newCredit) => {});
       if (!result.success) throw new Error(result.error || 'AI generation failed');
       const resultText = result.text || '';
       const factorRegex = /\[FACTOR\](.*?)\|(.*?)\|(.*?)\[\/FACTOR\]/g;
@@ -114,7 +115,8 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
     Provide the suggestions in a clear, bulleted list. Return only the suggestions in Vietnamese.`;
     
     try {
-        const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+        const request = { prompt, provider: 'gemini' };
+        const result = await generateTextViaBackend(request, (newCredit) => {});
         if (!result.success) throw new Error(result.error || 'AI generation failed');
         updateState({ suggestions: result.text, loadingMessage: "Nhận gợi ý Gemini hoàn tất!" });
     } catch (e) {
@@ -159,7 +161,8 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
     \nHãy trả về toàn bộ kịch bản đã được cải thiện bằng tiếng Việt.`;
     
     try {
-      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      const request = { prompt, provider: 'gemini' };
+      const result = await generateTextViaBackend(request, (newCredit) => {});
       if (!result.success) throw new Error(result.error || 'AI generation failed');
       updateState({ improvedStory: result.text, loadingMessage: "Cải thiện truyện hoàn tất!" });
     } catch (e) {
@@ -209,7 +212,8 @@ const AnalysisModule: React.FC<AnalysisModuleProps> = ({ moduleState, setModuleS
     Hãy trình bày kết quả phân tích một cách rõ ràng, mạch lạc, bằng tiếng Việt.`;
 
     try {
-      const result = await generateAiContent(prompt, 'gemini', keyInfo.key);
+      const request = { prompt, provider: 'gemini' };
+      const result = await generateTextViaBackend(request, (newCredit) => {});
       if (!result.success) throw new Error(result.error || 'AI generation failed');
       updateState({ viralOutlineAnalysisResult: result.text, loadingMessage: "Phân tích Dàn Ý Viral hoàn tất!" });
     } catch (e) {
