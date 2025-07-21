@@ -1,4 +1,4 @@
-# Cấu hình cho Netlify để build trang admin
+# Netlify configuration for frontend app with backend proxy
 
 [build]
   command = "npm run build"
