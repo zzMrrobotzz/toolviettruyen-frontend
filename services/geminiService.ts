@@ -2,9 +2,10 @@
 import { GoogleGenAI, GenerateContentResponse, GenerateContentParameters, Part, GroundingChunk as GenAIGroundingChunk } from "@google/genai";
 import { MODEL_TEXT, MODEL_IMAGE, GroundingChunk } from '../types';
 
-// Fixed: Use static default to prevent runtime errors
+// Get environment API key with proper fallback
 const getEnvApiKey = () => {
-  return 'default_gemini_key_placeholder';
+  // First try process.env, then fallback to requiring user-provided key
+  return process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 };
 
 let ai: GoogleGenAI | null = null;
@@ -15,8 +16,8 @@ const getAIInstance = (userApiKey?: string): GoogleGenAI => {
   const envApiKey = getEnvApiKey();
   const effectiveApiKey = (userApiKey && userApiKey.trim() !== "") ? userApiKey.trim() : envApiKey;
 
-  if (!effectiveApiKey || effectiveApiKey === "YOUR_GEMINI_API_KEY_MUST_BE_SET_IN_ENVIRONMENT") {
-    throw new Error("Invalid or missing Gemini API Key. Please ensure an API_KEY is correctly set in the UI or environment.");
+  if (!effectiveApiKey || effectiveApiKey.trim() === '' || effectiveApiKey === "YOUR_GEMINI_API_KEY_MUST_BE_SET_IN_ENVIRONMENT") {
+    throw new Error("Gemini API Key is required. Please provide a valid API key through the user interface or contact support.");
   }
 
   if (!ai || effectiveApiKey !== lastUsedEffectiveApiKey) {
