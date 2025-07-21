@@ -113,8 +113,9 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
                 const descriptionKey = Math.round(rewriteLevel / 25) * 25;
                 const levelDescription = levelDescriptions[descriptionKey];
 
-                const selectedSourceLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === sourceLanguage)?.label || sourceLanguage;
-                const selectedTargetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === targetLanguage)?.label || targetLanguage;
+                // Use the actual language values (English, Vietnamese, etc.) for AI consistency
+                const selectedSourceLangLabel = sourceLanguage;
+                const selectedTargetLangLabel = targetLanguage;
 
                 let localizationRequest = '';
                 if (targetLanguage !== sourceLanguage && adaptContext) {

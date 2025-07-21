@@ -124,8 +124,9 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     let fullRewrittenStory = '';
     let characterMapForItem: string | null = null; 
 
-    const selectedSourceLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentSourceLanguage)?.label || currentSourceLanguage;
-    const selectedTargetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentTargetLanguage)?.label || currentTargetLanguage;
+    // Use the actual language values (English, Vietnamese, etc.) for AI consistency
+    const selectedSourceLangLabel = currentSourceLanguage;
+    const selectedTargetLangLabel = currentTargetLanguage;
     
     const systemInstructionForRewrite = "You are an expert multilingual text rewriting AI. Your primary function is to transform input text according to precise instructions, ensuring that when a rewrite is requested (degree of change > 0%), the output is a modified version of the input, not the original input itself.";
 
@@ -265,8 +266,9 @@ You are provided with a Character Map: \`${characterMapForItem}\`. You MUST adhe
   ): Promise<string> => {
     onProgress(itemId, 'editing', 'Đang tinh chỉnh logic...');
     
-    const selectedSourceLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentSourceLanguage)?.label || currentSourceLanguage;
-    const selectedTargetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentTargetLanguage)?.label || currentTargetLanguage;
+    // Use the actual language values (English, Vietnamese, etc.) for AI consistency
+    const selectedSourceLangLabel = currentSourceLanguage;
+    const selectedTargetLangLabel = currentTargetLanguage;
 
     const editPrompt = `You are a meticulous story editor with an eidetic memory. Your task is to find and fix every single consistency error in the "Văn Bản Đã Viết Lại". You will cross-reference it against the "Văn Bản Gốc Ban Đầu" and the "Character Map" to ensure perfect logical and narrative integrity.
 
