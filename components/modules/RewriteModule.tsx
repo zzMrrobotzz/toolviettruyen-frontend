@@ -294,20 +294,27 @@ ${textToEdit}
 - Không thêm bất kỳ lời bình luận hay giải thích nào.
 `;
 
-            // Fallback prompt if main prompt fails
-            const fallbackEditPrompt = `You are a story editor. Edit this text for consistency and clarity:
+            // Enhanced fallback prompt to prevent content truncation
+            const fallbackEditPrompt = `You are a professional story editor. Your task is to carefully edit and improve this text while preserving its FULL length and ALL content.
 
-**Text to Edit:**
+**ORIGINAL TEXT FOR REFERENCE:**
+---
+${originalText}
+---
+
+**TEXT TO EDIT (must maintain complete length and all details):**
+---
 ${textToEdit}
+---
 
-**Instructions:**
-1. Ensure character names are consistent throughout
-2. Fix any plot contradictions
-3. Improve flow and grammar
-4. Return only the edited text
+**CRITICAL EDITING REQUIREMENTS:**
+1. **PRESERVE COMPLETE LENGTH**: The edited version MUST be approximately the same length as the input text. Do NOT shorten, summarize, or truncate any part.
+2. **KEEP ALL SCENES AND DIALOGUE**: Maintain every scene, conversation, and narrative element from the text being edited.
+3. **CHARACTER CONSISTENCY**: Ensure all character names remain consistent throughout the entire text.
+4. **PLOT COHERENCE**: Fix any logical contradictions while keeping all story elements intact.
+5. **LANGUAGE IMPROVEMENT**: Enhance grammar, flow, and readability without changing the content or length.
 
-**Output:**
-Return only the edited text without explanations.`;
+**ABSOLUTE REQUIREMENT**: Return the COMPLETE edited text with all original content preserved. The output must be as detailed and lengthy as the input text - do not cut anything out.`;
 
             let result;
             try {
@@ -324,19 +331,34 @@ Return only the edited text without explanations.`;
                     throw networkError;
                 }
             } catch (mainError) {
-                console.warn(`❌ Full prompt failed: ${(mainError as Error).message}, trying fallback`);
-                updateStateInput({ loadingMessage: 'Prompt chính lỗi, đang thử phương án dự phòng...' });
+                const errorMsg = (mainError as Error).message;
+                console.warn(`❌ Full prompt failed: ${errorMsg}`);
                 
-                // Try fallback prompt with the same enhanced error handling
-                try {
-                    result = await generateTextViaBackend({ prompt: fallbackEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
-                    if (!result.success) throw new Error(result.error || 'Fallback prompt failed');
-                } catch (fallbackNetworkError) {
-                    const errorMsg = (fallbackNetworkError as Error).message;
-                    if (errorMsg.includes('Failed to fetch') || errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
-                        throw new Error('Backend không khả dụng. Vui lòng thử lại sau.');
+                // Only use fallback for specific errors (rate limits, token limits, network issues)
+                if (errorMsg.includes('rate limit') || 
+                    errorMsg.includes('token') || 
+                    errorMsg.includes('too long') ||
+                    errorMsg.includes('RATE_LIMIT_EXCEEDED') ||
+                    errorMsg.includes('502') || 
+                    errorMsg.includes('Bad Gateway') ||
+                    errorMsg.includes('Failed to fetch')) {
+                    
+                    console.log('🔄 Using enhanced fallback due to technical limitation...');
+                    updateStateInput({ loadingMessage: 'Prompt phức tạp, đang dùng phương án tối ưu...' });
+                    
+                    try {
+                        result = await generateTextViaBackend({ prompt: fallbackEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
+                        if (!result.success) throw new Error(result.error || 'Fallback prompt failed');
+                    } catch (fallbackNetworkError) {
+                        const fallbackErrorMsg = (fallbackNetworkError as Error).message;
+                        if (fallbackErrorMsg.includes('Failed to fetch') || fallbackErrorMsg.includes('502') || fallbackErrorMsg.includes('Bad Gateway')) {
+                            throw new Error('Backend không khả dụng. Vui lòng thử lại sau.');
+                        }
+                        throw fallbackNetworkError;
                     }
-                    throw fallbackNetworkError;
+                } else {
+                    // For other errors, don't use fallback - just throw the original error
+                    throw mainError;
                 }
             }
             
