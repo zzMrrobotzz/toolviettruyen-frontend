@@ -33,10 +33,16 @@ export const generateTextViaBackend = async (
       body: JSON.stringify(request),
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      // Handle non-JSON responses (like HTML error pages from proxy)
+      throw new Error(`Server error (${response.status}): ${response.statusText}`);
+    }
 
     if (!response.ok) {
-      throw new Error(data.error || 'AI generation failed');
+      throw new Error(data.error || data.message || `Server error: ${response.status}`);
     }
 
     if (data.success && typeof data.remainingCredits === 'number') {
