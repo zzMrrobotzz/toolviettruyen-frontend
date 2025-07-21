@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StatCard from '../components/StatCard';
-import { fetchKeys, fetchDashboardStats, fetchAuditLogs, fetchApiProviders } from '../services/keyService';
+import { fetchKeys, fetchDashboardStats, fetchAuditLogs, fetchApiProviders, fetchDailyApiStats } from '../services/keyService';
 import { DollarSign, KeyRound, Users, Activity, Cpu, Cloud, Shield, CreditCard, TrendingUp, AlertTriangle } from 'lucide-react';
 import { message, Empty, Row, Col, List, Card as AntCard, Spin } from 'antd';
 import { AdminKey, ManagedApiProvider } from '../types';
@@ -24,10 +24,11 @@ const AdminDashboard: React.FC = () => {
                 setLoading(true);
                 
                 // Gọi song song các API để tải nhanh hơn với fallback handling
-                const [keysData, statsData, providersData, logsData] = await Promise.all([
+                const [keysData, statsData, providersData, dailyApiData, logsData] = await Promise.all([
                     fetchKeys().catch(() => []), // Fallback to empty array if failed
                     fetchDashboardStats().catch(() => null), // Fallback to null if failed
                     fetchApiProviders().catch(() => []), // Fallback to empty array if failed
+                    fetchDailyApiStats().catch(() => []), // Fallback to empty array if failed
                     fetchAuditLogs().catch(() => []) // Fallback to empty array if failed
                 ]);
 
@@ -62,8 +63,20 @@ const AdminDashboard: React.FC = () => {
                     setApiUsageStats({ totalRequests: 0, costToday: 0 });
                 }
 
-                // Cập nhật state cho Providers và Logs với defensive programming
-                setApiProviders(Array.isArray(providersData) ? providersData : []);
+                // Merge daily API stats with providers data
+                let mergedProviders = Array.isArray(providersData) ? providersData : [];
+                if (Array.isArray(dailyApiData) && dailyApiData.length > 0) {
+                    mergedProviders = mergedProviders.map(provider => {
+                        const dailyStats = dailyApiData.find(daily => daily.provider?.toLowerCase() === provider.name?.toLowerCase());
+                        return {
+                            ...provider,
+                            dailyRequests: dailyStats?.requests || 0
+                        };
+                    });
+                }
+                
+                // Cập nhật state cho Providers và Logs với defensive programming  
+                setApiProviders(mergedProviders);
                 setAuditLogs(Array.isArray(logsData) ? logsData : []);
 
             } catch (error: any) {
@@ -126,6 +139,33 @@ const AdminDashboard: React.FC = () => {
                     <Col span={6}><StatCard title="Providers Hoạt Động" value={formatNumber(activeProvidersCount)} Icon={Shield}/></Col>
                     <Col span={6}><StatCard title="Tổng Requests Toàn Hệ Thống" value={formatNumber(apiUsageStats.totalRequests)} Icon={Cloud}/></Col>
                     <Col span={6}><StatCard title="Chi Phí Ước Tính Hôm Nay" value={`$${(apiUsageStats.costToday || 0).toFixed(2)}`} Icon={DollarSign}/></Col>
+                </Row>
+            </div>
+
+            {/* Daily API Request Statistics by Provider */}
+            <div>
+                <h2 className="text-xl font-semibold text-gray-700 mb-4">📈 Thống Kê Request Hôm Nay Theo API</h2>
+                <Row gutter={16}>
+                    {apiProviders.map((provider, index) => {
+                        const dailyRequests = provider.dailyRequests || 0;
+                        const costToday = provider.costToday || 0;
+                        return (
+                            <Col span={6} key={provider._id || index}>
+                                <AntCard size="small" className="h-full">
+                                    <div className="text-center">
+                                        <div className="text-lg font-semibold text-gray-800">{provider.name}</div>
+                                        <div className="text-2xl font-bold text-blue-600 my-2">{formatNumber(dailyRequests)}</div>
+                                        <div className="text-sm text-gray-500">requests hôm nay</div>
+                                        <div className="text-sm text-green-600 font-medium">${costToday.toFixed(2)}</div>
+                                        <div className={`inline-block w-2 h-2 rounded-full mt-1 ${
+                                            provider.status === 'Operational' ? 'bg-green-500' : 
+                                            provider.status === 'Error' ? 'bg-red-500' : 'bg-yellow-500'
+                                        }`}></div>
+                                    </div>
+                                </AntCard>
+                            </Col>
+                        );
+                    })}
                 </Row>
             </div>
 

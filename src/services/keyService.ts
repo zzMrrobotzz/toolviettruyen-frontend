@@ -273,6 +273,27 @@ export const fetchAuditLogs = async () => {
 };
 
 /**
+ * Lấy thống kê chi tiết các API requests hôm nay theo từng provider.
+ */
+export const fetchDailyApiStats = async () => {
+  try {
+    const response = await retryRequest(() => apiClient.get('/stats/daily-api-usage'));
+    
+    // Validate response is array
+    const data = response.data;
+    if (!Array.isArray(data)) {
+      console.warn('Daily API stats response is not array:', data);
+      return [];
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('fetchDailyApiStats error:', error);
+    handleError(error);
+  }
+};
+
+/**
  * Gửi yêu cầu tạo nội dung AI thông qua backend proxy.
  */
 export const generateAiContent = async (prompt: string, provider: string, userKey: string) => {
