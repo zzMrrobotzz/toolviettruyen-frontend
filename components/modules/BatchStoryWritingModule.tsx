@@ -39,6 +39,8 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     batchProgressMessage, batchError, concurrencyLimit
   } = moduleState;
 
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
   // History management
   const [showHistory, setShowHistory] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
@@ -53,15 +55,18 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
-  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings) => {
+  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal) => {
     const request = {
       prompt,
-      provider: apiSettings?.provider || 'gemini'
+      provider: apiSettings?.provider || 'gemini',
+      model: apiSettings?.model,
+      temperature: apiSettings?.temperature,
+      maxTokens: apiSettings?.maxTokens,
     };
 
     const result = await generateTextViaBackend(request, (newCredit) => {
       // Update credit if needed
-    });
+    }, signal);
 
     if (!result.success) {
       throw new Error(result.error || 'AI generation failed');
@@ -70,15 +75,18 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     return result.text || '';
   };
 
-  const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings): Promise<T> => {
+  const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal): Promise<T> => {
     const request = {
       prompt,
-      provider: apiSettings?.provider || 'gemini'
+      provider: apiSettings?.provider || 'gemini',
+      model: apiSettings?.model,
+      temperature: apiSettings?.temperature,
+      maxTokens: apiSettings?.maxTokens,
     };
 
     const result = await generateTextViaBackend(request, (newCredit) => {
       // Update credit if needed
-    });
+    }, signal);
 
     if (!result.success) {
       throw new Error(result.error || 'AI generation failed');
@@ -120,14 +128,15 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
 
   const generateSingleStoryForBatch = async (
     item: BatchStoryInputItem,
-    updateItemProgress: (updates: Partial<GeneratedBatchStoryOutputItem>) => void
+    updateItemProgress: (updates: Partial<GeneratedBatchStoryOutputItem>) => void,
+    signal: AbortSignal
   ): Promise<Omit<GeneratedBatchStoryOutputItem, 'id' | 'originalOutline'>> => {
     
     // --- Define service functions based on provider ---
-    const textGenerator = (prompt: string) => generateText(prompt, undefined, apiSettings);
+    const textGenerator = (prompt: string) => generateText(prompt, undefined, apiSettings, signal);
     
     const jsonGenerator = <T,>(prompt: string): Promise<T> => {
-        return generateTextWithJsonOutput<T>(prompt, undefined, apiSettings);
+        return generateTextWithJsonOutput<T>(prompt, undefined, apiSettings, signal);
     };
 
 
@@ -165,6 +174,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
             ${item.outline.substring(0,2000)} 
             ---`;
             await delay(500);
+            if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
             const keyElementResultText = await textGenerator(keyElementPrompt);
             if (keyElementResultText.trim()) {
                 keyElementsFromOutline = keyElementResultText.trim();
@@ -195,6 +205,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
         \n**Yêu cầu hiện tại (Phần ${i + 1}/${numChunks}):** Viết phần tiếp theo, liền mạch, TRUNG THÀNH với "Dàn ý tổng thể" và các yếu tố cốt lõi (nếu có). Chỉ viết nội dung, không tiêu đề.`;
         
         if (i > 0) await delay(1000);
+        if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
         const resultText = await textGenerator(storyPrompt);
         fullStory += (fullStory ? '\n\n' : '') + resultText.trim();
     }
@@ -239,6 +250,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     ---
     Hãy trả về TOÀN BỘ câu chuyện đã biên tập bằng ${outputLanguageLabel}. Không giới thiệu, không tiêu đề.`;
 
+    if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
     const editedStory = await textGenerator(editPrompt);
     if (!editedStory.trim()) {
         throw new Error("Không thể biên tập truyện.");
@@ -270,12 +282,13 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     }
     CHỈ TRẢ VỀ JSON.`;
     
+    if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
     const analysisResult = await jsonGenerator<EditStoryAnalysisReport>(analysisPrompt);
 
     // Save to history after successful completion
     if (editedStory && editedStory.trim()) {
         addToHistory('batch-story', editedStory.trim(), {
-            originalText: item.originalOutline,
+            originalText: item.outline,
             settings: {
                 targetLength: item.specificTargetLength ?? globalTargetLength,
                 writingStyle: item.specificWritingStyle ?? globalWritingStyle,
@@ -308,6 +321,9 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
       return;
     }
 
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, concurrencyLimit));
 
     updateState({
@@ -337,19 +353,29 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     const worker = async () => {
       while (taskQueue.length > 0) {
         const item = taskQueue.shift();
-        if (!item) continue;
+        if (!item || signal.aborted) continue;
 
         try {
           updateResultCallback(item.id, { status: 'writing', progressMessage: 'Bắt đầu xử lý...' });
           
           const singleStoryResult = await generateSingleStoryForBatch(
             item,
-            (updates) => updateResultCallback(item.id, updates)
+            (updates) => updateResultCallback(item.id, updates),
+            signal
           );
           
           updateResultCallback(item.id, { ...singleStoryResult });
 
         } catch (e) {
+          if ((e as Error).name === 'AbortError') {
+              updateResultCallback(item.id, {
+                status: 'error',
+                error: 'Quá trình đã bị người dùng dừng lại.',
+                progressMessage: 'Đã dừng'
+              });
+              // Stop this worker
+              break;
+          }
           updateResultCallback(item.id, {
             status: 'error',
             error: (e as Error).message,
@@ -372,7 +398,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
 
     updateState({ 
         isProcessingBatch: false, 
-        batchProgressMessage: `Hoàn thành xử lý toàn bộ ${validItems.length} truyện.` 
+        batchProgressMessage: signal.aborted ? 'Quá trình đã bị dừng.' : `Hoàn thành xử lý toàn bộ ${validItems.length} truyện.` 
     });
     
     // Update history count after batch completion
@@ -382,6 +408,12 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     setTimeout(() => updateState({ batchProgressMessage: null }), 5000);
   };
   
+  const handleStopBatch = () => {
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+    }
+  };
+
   const copyToClipboard = (text: string, buttonId: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
@@ -514,12 +546,19 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
       </div>
 
       {/* Action Button & Progress */}
-      <button onClick={handleStartBatchWriting} disabled={isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.outline.trim())} className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg">
-        🚀 Bắt Đầu Viết Hàng Loạt ({inputItems.filter(it => it.outline.trim()).length} truyện)
-      </button>
+      <div className="flex flex-col items-center gap-4">
+        <button onClick={handleStartBatchWriting} disabled={isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.outline.trim())} className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg">
+            🚀 Bắt Đầu Viết Hàng Loạt ({inputItems.filter(it => it.outline.trim()).length} truyện)
+        </button>
+        {isProcessingBatch && (
+            <button onClick={handleStopBatch} className="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-700">
+                Dừng Toàn Bộ
+            </button>
+        )}
+      </div>
 
       {isProcessingBatch && batchProgressMessage && <LoadingSpinner message={batchProgressMessage} />}
-      {!isProcessingBatch && batchProgressMessage && <p className={`text-center font-semibold my-3 ${batchProgressMessage.includes("Hoàn thành") ? 'text-green-600' : 'text-indigo-600'}`}>{batchProgressMessage}</p>}
+      {!isProcessingBatch && batchProgressMessage && <p className={`text-center font-semibold my-3 ${batchProgressMessage.includes("Hoàn thành") || batchProgressMessage.includes("dừng") ? 'text-green-600' : 'text-indigo-600'}`}>{batchProgressMessage}</p>}
       {batchError && <ErrorAlert message={batchError} />}
 
       {/* Results */}

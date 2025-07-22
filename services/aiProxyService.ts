@@ -65,11 +65,20 @@ const retryWithBackoffAndFallback = async <T>(
 // Hàm chính để gọi AI qua webadmin backend
 export const generateTextViaBackend = async (
   request: AIRequest,
-  updateCreditFunction: (newCredit: number) => void
+  updateCreditFunction: (newCredit: number) => void,
+  signal?: AbortSignal // Thêm tham số signal tùy chọn
 ): Promise<AIResponse> => {
   return retryWithBackoffAndFallback(async (apiUrl: string) => {
+    // Nếu signal đã bị hủy trước khi bắt đầu, hãy dừng lại ngay
+    if (signal?.aborted) {
+      throw new DOMException('Request aborted by user', 'AbortError');
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
+
+    // Lắng nghe sự kiện abort từ signal bên ngoài
+    signal?.addEventListener('abort', () => controller.abort());
 
     try {
       const response = await fetch(`${apiUrl}/ai/generate`, {

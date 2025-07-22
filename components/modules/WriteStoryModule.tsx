@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ApiSettings, WriteStoryModuleState, WriteStoryActiveTab, BatchOutlineItem } from '../../types'; // Removed GeneratedBatchStoryItem
 import { 
     WRITING_STYLE_OPTIONS, HOOK_LANGUAGE_OPTIONS, HOOK_STYLE_OPTIONS, 
@@ -25,20 +25,26 @@ interface WriteStoryModuleProps {
 }
 
 const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis }) => {
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
   const generateText = async (
     prompt: string,
     systemInstruction?: string,
     useJsonOutput?: boolean,
-    apiSettings?: ApiSettings
+    apiSettings?: ApiSettings,
+    signal?: AbortSignal
   ) => {
     const request = {
       prompt,
-      provider: apiSettings?.provider || 'gemini'
+      provider: apiSettings?.provider || 'gemini',
+      model: apiSettings?.model,
+      temperature: apiSettings?.temperature,
+      maxTokens: apiSettings?.maxTokens,
     };
 
     const result = await generateTextViaBackend(request, (newCredit) => {
       // Update credit if needed
-    });
+    }, signal);
 
     if (!result.success) {
       throw new Error(result.error || 'AI generation failed');
@@ -67,7 +73,6 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
   } = moduleState;
 
   const [isSingleOutlineExpanded, setIsSingleOutlineExpanded] = useState(true);
-  const [currentAbortController, setCurrentAbortController] = useState<AbortController | null>(null);
   const { consumeCredit } = useAppContext();
 
   // History management
@@ -96,8 +101,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
   };
 
   const handleCancelOperation = () => {
-    if (currentAbortController) {
-      currentAbortController.abort();
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
       // Update specific loading message based on active tab
       if (activeWriteTab === 'singleStory') {
         updateState({ storyLoadingMessage: "Đang hủy viết truyện..." });
@@ -151,8 +156,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       return;
     }
     
-    const abortCtrl = new AbortController();
-    setCurrentAbortController(abortCtrl);
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
     updateState({ hookError: null, generatedHooks: '', hookLoadingMessage: 'Đang tạo hooks...' });
     
     let ctaInstructionSegment = ctaChannel.trim() ? `\n- If a Call To Action (CTA) is appropriate for the chosen hook structure (e.g., as part of 'Action' in AIDA, or at the end), incorporate a compelling CTA to like, comment, and subscribe to the channel "${ctaChannel.trim()}".` : "";
@@ -184,8 +189,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     \n---`;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, apiSettings);
-      if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const result = await generateText(prompt, undefined, undefined, apiSettings, signal);
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const text = typeof result === 'string' ? result : result.text;
       updateState({ generatedHooks: text, hookLoadingMessage: "Tạo hook hoàn tất!" });
     } catch (e: any) {
@@ -195,7 +200,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         updateState({ hookError: `Đã xảy ra lỗi khi tạo hook: ${e.message}`, hookLoadingMessage: "Lỗi tạo hook." });
       }
     } finally {
-      setCurrentAbortController(null);
+      abortControllerRef.current = null;
       setTimeout(() => setModuleState(prev => (prev.hookLoadingMessage?.includes("hoàn tất") || prev.hookLoadingMessage?.includes("Lỗi") || prev.hookLoadingMessage?.includes("Đã hủy")) ? {...prev, hookLoadingMessage: null} : prev), 3000);
     }
   };
@@ -221,8 +226,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       currentStoryStyle = WRITING_STYLE_OPTIONS.find(opt => opt.value === writingStyle)?.label || writingStyle;
     }
 
-    const abortCtrl = new AbortController();
-    setCurrentAbortController(abortCtrl);
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     updateState({ 
         storyError: null, 
@@ -266,7 +271,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     let capturedKeyElements: string | null = null;
     try {
       for (let i = 0; i < numChunks; i++) {
-        if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
         updateState({ storyLoadingMessage: `Đang viết phần ${i + 1}/${numChunks} của truyện (mục tiêu tổng: ~${currentTargetLengthNum} từ) bằng ${outputLanguageLabel}...`, storyProgress: Math.round(((i + 1) / numChunks) * 100) });
         const context = fullStory.length > 2000 ? '...\n' + fullStory.slice(-2000) : fullStory;
         let prompt = `Bạn là một nhà văn đa ngôn ngữ. Viết tiếp câu chuyện BẰNG NGÔN NGỮ ${outputLanguageLabel}, dựa HOÀN TOÀN vào "Dàn ý tổng thể".
@@ -293,9 +298,9 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         \n- Chỉ viết nội dung phần tiếp theo, không lặp lại, không tiêu đề.
         \nBắt đầu viết phần tiếp theo (bằng ${outputLanguageLabel}):`;
 
-        if (i > 0) await delay(1000, abortCtrl.signal); 
-        const result = await generateText(prompt, undefined, undefined, apiSettings);
-        if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        if (i > 0) await delay(1000, signal); 
+        const result = await generateText(prompt, undefined, undefined, apiSettings, signal);
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
         let currentChunkText = result.text;
         if (i === 0) {
             const keyElementsMatch = currentChunkText.match(/\[KEY_ELEMENTS\]([\s\S]*?)\[\/KEY_ELEMENTS\]/);
@@ -310,9 +315,9 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       }
       updateState({ storyLoadingMessage: 'Hoàn thành viết truyện! Chuẩn bị biên tập độ dài.' });
       
-      await delay(1000, abortCtrl.signal); 
+      await delay(1000, signal); 
       if(fullStory.trim()){
-          await handleEditStory(fullStory, storyOutline, capturedKeyElements, undefined, abortCtrl); // Pass abortCtrl
+          await handleEditStory(fullStory, storyOutline, capturedKeyElements, undefined, signal); // Pass signal
       } else {
         updateState({ storyError: "Không thể tạo nội dung truyện.", storyLoadingMessage: null, storyProgress: 0 });
       }
@@ -323,7 +328,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         updateState({ storyError: `Đã xảy ra lỗi khi viết truyện: ${e.message}`, storyLoadingMessage: null, storyProgress: 0 });
       }
     } finally {
-      setCurrentAbortController(null);
+      abortControllerRef.current = null;
       // Let editStory's finally block handle clearing the "Đã hủy" if it's the one that sets it
       if (storyLoadingMessage !== 'Đã hủy biên tập.') {
         setTimeout(() => setModuleState(prev => (prev.storyLoadingMessage === 'Đã hủy.' || prev.storyLoadingMessage === 'Hoàn thành viết truyện! Chuẩn bị biên tập độ dài.' || (prev.storyError && !prev.storyLoadingMessage?.includes("Đã hủy"))) ? {...prev, storyLoadingMessage: null} : prev), 3000);
@@ -336,16 +341,17 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     originalOutlineParam: string, 
     keyElementsInstruction?: string | null, 
     itemIndex?: number, // Not used for single story edit here
-    externalAbortController?: AbortController // Accept controller from calling function
+    signal?: AbortSignal // Accept signal from calling function
   ) => {
-    const abortCtrl = externalAbortController || new AbortController();
-    if (!externalAbortController) { // If called directly, manage its own controller
-        setCurrentAbortController(abortCtrl);
+    // If called directly without a signal, create one.
+    if (!signal) {
+        abortControllerRef.current = new AbortController();
+        signal = abortControllerRef.current.signal;
     }
 
     if (!storyToEdit.trim()) {
       updateState({ storyError: 'Không có truyện để biên tập.', singleStoryEditProgress: null, storyLoadingMessage: null, hasSingleStoryBeenEditedSuccessfully: false });
-      if (!externalAbortController) setCurrentAbortController(null);
+      abortControllerRef.current = null;
       return;
     }
 
@@ -411,8 +417,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     Không thêm bất kỳ lời bình, giới thiệu, hay tiêu đề nào.`;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, apiSettings);
-      if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const result = await generateText(prompt, undefined, undefined, apiSettings, signal);
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const text = typeof result === 'string' ? result : result.text;
       updateState({ 
         generatedStory: text, 
@@ -450,7 +456,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         });
       }
     } finally {
-        if (!externalAbortController) setCurrentAbortController(null);
+        abortControllerRef.current = null;
         setTimeout(() => setModuleState(prev => (prev.storyLoadingMessage?.includes("ĐÃ BIÊN TẬP XONG") || prev.storyLoadingMessage?.includes("Lỗi biên tập") || prev.storyLoadingMessage?.includes("Đã hủy biên tập")) ? {...prev, storyLoadingMessage: null, singleStoryEditProgress: null} : prev), 3000);
     }
   };
@@ -495,8 +501,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
       currentLessonStyle = customLessonWritingStyle.trim();
     }
 
-    const abortCtrl = new AbortController();
-    setCurrentAbortController(abortCtrl);
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
     updateState({ lessonError: null, generatedLesson: '', lessonLoadingMessage: 'Đang đúc kết bài học...' });
     const selectedOutputLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === outputLanguage)?.label || outputLanguage;
     
@@ -513,8 +519,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     \n- The lesson must be written in **${selectedOutputLangLabel}**. ${ctaLessonSegment}
     \n- Return only the lesson text. No introductions or other text.`;
     try {
-      const result = await generateText(prompt, undefined, undefined, apiSettings);
-      if (abortCtrl.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const result = await generateText(prompt, undefined, undefined, apiSettings, signal);
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const text = typeof result === 'string' ? result : result.text;
       updateState({ generatedLesson: text, lessonLoadingMessage: "Đúc kết bài học hoàn tất!" });
     } catch (e: any) {
@@ -524,7 +530,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         updateState({ lessonError: `Đã xảy ra lỗi khi đúc kết bài học: ${e.message}`, lessonLoadingMessage: "Lỗi đúc kết bài học." });
       }
     } finally {
-       setCurrentAbortController(null);
+       abortControllerRef.current = null;
        setTimeout(() => setModuleState(prev => (prev.lessonLoadingMessage?.includes("hoàn tất") || prev.lessonLoadingMessage?.includes("Lỗi") || prev.lessonLoadingMessage?.includes("Đã hủy")) ? {...prev, lessonLoadingMessage: null} : prev), 3000);
     }
   };
@@ -543,8 +549,8 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
   const TabButton: React.FC<{ tabId: WriteStoryActiveTab; label: string, icon: string }> = ({ tabId, label, icon }) => (
     <button
       onClick={() => {
-        if (currentAbortController) currentAbortController.abort(); // Cancel any ongoing operation before switching tabs
-        setCurrentAbortController(null);
+        if (abortControllerRef.current) abortControllerRef.current.abort(); // Cancel any ongoing operation before switching tabs
+        abortControllerRef.current = null;
         updateState({
             activeWriteTab: tabId,
             storyError: tabId === 'singleStory' ? moduleState.storyError : null,

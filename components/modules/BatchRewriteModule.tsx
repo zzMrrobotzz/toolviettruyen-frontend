@@ -35,6 +35,8 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     isProcessingBatch, batchProgressMessage, batchError, concurrencyLimit
   } = moduleState;
 
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
   // History management
   const [showHistory, setShowHistory] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
@@ -43,15 +45,18 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     setModuleState(prev => ({ ...prev, ...updates }));
   };
   
-  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings) => {
+  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal) => {
     const request = {
       prompt,
-      provider: apiSettings?.provider || 'gemini'
+      provider: apiSettings?.provider || 'gemini',
+      model: apiSettings?.model,
+      temperature: apiSettings?.temperature,
+      maxTokens: apiSettings?.maxTokens,
     };
 
     const result = await generateTextViaBackend(request, (newCredit) => {
       // Update credit if needed
-    });
+    }, signal);
 
     if (!result.success) {
       throw new Error(result.error || 'AI generation failed');
@@ -117,7 +122,8 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     currentAdaptContext: boolean,
     itemId: string, // For progress updates
     onProgress: (itemId: string, status: GeneratedBatchRewriteOutputItem['status'], message: string | null, charMap?: string) => void,
-    textGenerator: (prompt: string, systemInstruction?: string) => Promise<string>
+    textGenerator: (prompt: string, systemInstruction?: string, signal?: AbortSignal) => Promise<string>,
+    signal: AbortSignal
   ): Promise<{ rewrittenText: string, characterMapUsed: string | null }> => {
     const CHUNK_REWRITE_CHAR_COUNT = 4000; 
     const numChunks = Math.ceil(textToRewrite.length / CHUNK_REWRITE_CHAR_COUNT);
@@ -224,7 +230,8 @@ You are provided with a Character Map: \`${characterMapForItem}\`. You MUST adhe
       }
 
       if (i > 0) await delay(750);
-      const result = await textGenerator(prompt, systemInstructionForRewrite);
+      if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
+      const result = await textGenerator(prompt, systemInstructionForRewrite, signal);
       let partResultText = result || "";
 
       if (i === 0 && currentRewriteLevel >= 75) {
@@ -262,7 +269,8 @@ You are provided with a Character Map: \`${characterMapForItem}\`. You MUST adhe
     characterMapUsed: string | null, // Character map from rewrite process
     itemId: string, // For progress updates
     onProgress: (itemId: string, status: GeneratedBatchRewriteOutputItem['status'], message: string | null) => void,
-    textGenerator: (prompt: string, systemInstruction?: string) => Promise<string>
+    textGenerator: (prompt: string, systemInstruction?: string, signal?: AbortSignal) => Promise<string>,
+    signal: AbortSignal
   ): Promise<string> => {
     onProgress(itemId, 'editing', 'Đang tinh chỉnh logic...');
     
@@ -312,7 +320,8 @@ ${textToEdit}
     const systemInstructionForEdit = "You are a meticulous story editor. Your task is to refine and polish a given text, ensuring consistency, logical flow, and improved style, while respecting previous rewrite intentions.";
     
     await delay(1000);
-    const result = await textGenerator(editPrompt, systemInstructionForEdit);
+    if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
+    const result = await textGenerator(editPrompt, systemInstructionForEdit, signal);
     return result.trim();
   };
 
@@ -321,7 +330,8 @@ ${textToEdit}
       index: number, 
       totalItems: number,
       updateResultCallback: (id: string, updates: Partial<GeneratedBatchRewriteOutputItem>) => void,
-      textGenerator: (prompt: string, systemInstruction?: string) => Promise<string>
+      textGenerator: (prompt: string, systemInstruction?: string, signal?: AbortSignal) => Promise<string>,
+      signal: AbortSignal
     ) => {
     
     // Determine effective settings for the item
@@ -369,7 +379,8 @@ ${textToEdit}
                 ...(charMap && { characterMap: charMap }) // Store character map if provided
             });
         },
-        textGenerator
+        textGenerator,
+        signal
       );
       
       updateResultCallback(item.id, { rewrittenText: initiallyRewrittenText, progressMessage: 'Hoàn thành viết lại. Đang tự động tinh chỉnh...', characterMap: characterMapUsed });
@@ -390,7 +401,8 @@ ${textToEdit}
         characterMapUsed, // Pass character map for consistency checking
         item.id,
         (itemId, status, message) => updateResultCallback(itemId, { status: status, progressMessage: message }),
-        textGenerator
+        textGenerator,
+        signal
       );
 
       updateResultCallback(item.id, { 
@@ -417,6 +429,15 @@ ${textToEdit}
       }
 
     } catch (e) {
+      if ((e as Error).name === 'AbortError') {
+          updateResultCallback(item.id, { 
+              status: 'error', 
+              error: 'Quá trình xử lý đã bị dừng.', 
+              progressMessage: 'Đã dừng' 
+          });
+          // Rethrow to stop the worker
+          throw e;
+      }
       updateResultCallback(item.id, { 
         status: 'error', 
         error: (e as Error).message, 
@@ -439,17 +460,23 @@ ${textToEdit}
       return;
     }
 
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, concurrencyLimit));
     
-    const textGenerator = async (prompt: string, systemInstruction?: string) => {
+    const textGenerator = async (prompt: string, systemInstruction?: string, signal?: AbortSignal) => {
       const request = {
         prompt,
-        provider: apiSettings.provider || 'gemini'
+        provider: apiSettings.provider || 'gemini',
+        model: apiSettings.model,
+        temperature: apiSettings.temperature,
+        maxTokens: apiSettings.maxTokens,
       };
 
       const result = await generateTextViaBackend(request, (newCredit) => {
         // Update credit if needed
-      });
+      }, signal);
 
       if (!result.success) {
         throw new Error(result.error || 'AI generation failed');
@@ -493,10 +520,18 @@ ${textToEdit}
     const worker = async () => {
         while (taskQueue.length > 0) {
             const task = taskQueue.shift();
-            if (!task) continue;
+            if (!task || signal.aborted) continue;
 
             const { item, index } = task;
-            await processSingleBatchItem(item, index, validItems.length, updateResultCallback, textGenerator);
+            try {
+                await processSingleBatchItem(item, index, validItems.length, updateResultCallback, textGenerator, signal);
+            } catch (e) {
+                if ((e as Error).name === 'AbortError') {
+                    console.log('Worker stopping due to abort signal.');
+                    // Exit the loop for this worker
+                    break; 
+                }
+            }
         }
     };
     
@@ -507,7 +542,7 @@ ${textToEdit}
     setModuleState(prev => ({ 
         ...prev,
         isProcessingBatch: false, 
-        batchProgressMessage: `Hoàn thành xử lý toàn bộ ${validItems.length} mục.` 
+        batchProgressMessage: signal.aborted ? 'Quá trình đã bị dừng.' : `Hoàn thành xử lý toàn bộ ${validItems.length} mục.` 
     }));
     
     // Update history count after batch completion
@@ -517,6 +552,12 @@ ${textToEdit}
     setTimeout(() => updateState({ batchProgressMessage: null }), 5000);
   };
   
+  const handleStopBatchRewrite = () => {
+      if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+      }
+  };
+
   const handleRefineSingleResult = async (resultId: string) => {
     const resultItem = results.find(r => r.id === resultId);
     const originalInputItem = inputItems.find(i => i.id === resultId);
@@ -530,6 +571,10 @@ ${textToEdit}
         return;
     }
     
+    // Create a temporary controller for this single operation.
+    const tempAbortController = new AbortController();
+    const signal = tempAbortController.signal;
+
     setModuleState(prev => ({
         ...prev,
         isProcessingBatch: true, // Optional: might want a different flag for single item refinement within batch
@@ -539,7 +584,10 @@ ${textToEdit}
     const textGenerator = async (prompt: string, systemInstruction?: string) => {
       const request = {
         prompt,
-        provider: apiSettings.provider || 'gemini'
+        provider: apiSettings.provider || 'gemini',
+        model: apiSettings.model,
+        temperature: apiSettings.temperature,
+        maxTokens: apiSettings.maxTokens,
       };
 
       const result = await generateTextViaBackend(request, (newCredit) => {
@@ -601,7 +649,8 @@ ${textToEdit}
                     results: prev.results.map(r => r.id === itemId ? {...r, status: status, progressMessage: message} : r)
                 }));
             },
-            textGenerator
+            textGenerator,
+            signal
         );
         setModuleState(prev => ({
             ...prev,
@@ -792,12 +841,19 @@ ${textToEdit}
       </div>
 
       {/* Action Button & Progress */}
-      <button onClick={handleStartBatchRewrite} disabled={isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.originalText.trim())} className="w-full bg-gradient-to-r from-indigo-700 to-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg">
-        🚀 Bắt Đầu Viết Lại Hàng Loạt ({inputItems.filter(it => it.originalText.trim()).length} mục)
-      </button>
+      <div className="flex flex-col items-center gap-4">
+        <button onClick={handleStartBatchRewrite} disabled={isProcessingBatch || inputItems.length === 0 || inputItems.every(it => !it.originalText.trim())} className="w-full bg-gradient-to-r from-indigo-700 to-purple-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl hover:opacity-90 transition-opacity disabled:opacity-60 text-lg">
+          🚀 Bắt Đầu Viết Lại Hàng Loạt ({inputItems.filter(it => it.originalText.trim()).length} mục)
+        </button>
+        {isProcessingBatch && (
+            <button onClick={handleStopBatchRewrite} className="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-700">
+                Dừng Toàn Bộ
+            </button>
+        )}
+      </div>
 
       {isProcessingBatch && batchProgressMessage && <LoadingSpinner message={batchProgressMessage} />}
-      {!isProcessingBatch && batchProgressMessage && <p className={`text-center font-semibold my-3 ${batchProgressMessage.includes("Hoàn thành") ? 'text-green-600' : 'text-indigo-600'}`}>{batchProgressMessage}</p>}
+      {!isProcessingBatch && batchProgressMessage && <p className={`text-center font-semibold my-3 ${batchProgressMessage.includes("Hoàn thành") || batchProgressMessage.includes("dừng") ? 'text-green-600' : 'text-indigo-600'}`}>{batchProgressMessage}</p>}
       {batchError && <ErrorAlert message={batchError} />}
 
       {/* Results */}

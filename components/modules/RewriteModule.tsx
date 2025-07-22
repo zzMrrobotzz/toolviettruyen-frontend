@@ -57,6 +57,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
     }, [targetLanguage, sourceLanguage]);
 
     const [isProcessing, setIsProcessing] = React.useState(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
     
     // State for Character Map tracking - REMOVED FOR SIMPLICITY
     // const [characterMapForSession, setCharacterMapForSession] = React.useState<string | null>(null);
@@ -70,6 +71,10 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
             updateStateInput({ error: 'Lỗi: Vui lòng nhập văn bản cần viết lại!' });
             return;
         }
+        
+        abortControllerRef.current = new AbortController();
+        const signal = abortControllerRef.current.signal;
+
         setIsProcessing(true);
         // Trừ credit trước khi xử lý
         const hasCredits = await consumeCredit(1);
@@ -147,7 +152,7 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
                 };
                 let result;
                 try {
-                    result = await generateTextViaBackend(request, (newCredit) => {});
+                    result = await generateTextViaBackend(request, (newCredit) => {}, signal);
                     if (!result.success) {
                         throw new Error(result.error || 'AI generation failed');
                     }
@@ -162,6 +167,13 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
                     throw networkError;
                 }
                 
+                // Check if the process was aborted before processing the result
+                if (signal.aborted) {
+                    console.log("Rewrite process aborted by user.");
+                    // The error will be caught in the main catch block
+                    throw new DOMException('Operation aborted by user', 'AbortError');
+                }
+
                 const chunkResult = (result.text || '').trim();
                 
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + chunkResult;
@@ -190,10 +202,15 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
                 setHistoryCount(history.length);
             }
         } catch (e) {
-            updateStateInput({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
+            if ((e as Error).name === 'AbortError') {
+                updateStateInput({ error: 'Quá trình viết lại đã bị dừng bởi người dùng.', loadingMessage: 'Đã dừng', progress: 0 });
+            } else {
+                updateStateInput({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
+            }
         } finally {
             updateStateInput({ loadingMessage: null });
             setIsProcessing(false);
+            abortControllerRef.current = null;
         }
     };
 
@@ -201,6 +218,12 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
 
     // REMOVED handlePostRewriteEdit function entirely
     
+    const handleStop = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+    };
+
     const copyToClipboard = (text: string) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
@@ -278,9 +301,16 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
                     <label htmlFor="quickOriginalText" className="block text-sm font-medium text-gray-700 mb-1">Văn bản gốc:</label>
                     <textarea id="quickOriginalText" value={originalText} onChange={(e) => updateStateInput({ originalText: e.target.value })} rows={6} className="w-full p-3 border-2 border-gray-300 rounded-lg" placeholder="Nhập văn bản..." disabled={isProcessing}></textarea>
                 </div>
-                 <button onClick={handleSingleRewrite} disabled={isProcessing || !originalText.trim()} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
-                    Viết lại Văn bản
-                </button>
+                 <div className="flex flex-col items-center gap-4">
+                    <button onClick={handleSingleRewrite} disabled={isProcessing || !originalText.trim()} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:opacity-90 disabled:opacity-50">
+                        Viết lại Văn bản
+                    </button>
+                    {isProcessing && (
+                        <button onClick={handleStop} className="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-700">
+                            Dừng
+                        </button>
+                    )}
+                </div>
                 {isProcessing && <LoadingSpinner message={loadingMessage || editLoadingMessage || 'Đang xử lý...'} />}
                 {error && <ErrorAlert message={error} />}
                 {editError && <ErrorAlert message={editError} />}
