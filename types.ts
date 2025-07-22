@@ -247,7 +247,7 @@ export interface QuickRewriteState {
   error: string | null;
   progress: number;
   loadingMessage: string | null;
-  isProcessing: boolean;
+  isProcessing?: boolean;
   isEditing: boolean;
   editError: string | null;
   editLoadingMessage: string | null;

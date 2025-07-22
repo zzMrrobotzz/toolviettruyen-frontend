@@ -84,7 +84,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         // Chỉ reset rewrittenText ở đây
         setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: '', error: null, progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false } }));
         
-        const CHUNK_CHAR_COUNT = 4000;
+        const CHUNK_CHAR_COUNT = 20000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
         let fullRewrittenText = '';
 
