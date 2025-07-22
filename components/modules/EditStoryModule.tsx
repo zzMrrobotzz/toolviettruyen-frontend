@@ -15,7 +15,8 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
+import { useAppContext } from '../../AppContext';
 import { delay } from '../../utils';
 
 interface EditStoryModuleProps {
@@ -52,17 +53,34 @@ const EditStoryModule: React.FC<EditStoryModuleProps> = ({ apiSettings, moduleSt
 
   const [isSingleOutlineExpanded, setIsSingleOutlineExpanded] = useState(false);
   const [batchItemExpansionState, setBatchItemExpansionState] = useState<{[key: string]: boolean}>({});
+  const { consumeCredit } = useAppContext();
 
   const updateState = (updates: Partial<EditStoryModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
   };
   
   const generateTextLocal = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
-    return await generateText(prompt, systemInstruction, false, apiSettings?.apiKey);
+    const request = {
+      prompt,
+      provider: apiSettings?.provider || 'gemini',
+      model: apiSettings?.model,
+      temperature: apiSettings?.temperature,
+      maxTokens: apiSettings?.maxTokens,
+    };
+
+    const result = await generateTextViaBackend(request, (newCredit) => {
+      // Update credit if needed
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'AI generation failed');
+    }
+
+    return { text: result.text || '' };
   };
 
   const generateTextWithJsonOutputLocal = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings): Promise<T> => {
-    const result = await generateText(prompt, systemInstruction, false, apiSettings?.apiKey);
+    const result = await generateTextLocal(prompt, systemInstruction, false, apiSettings);
     
     // Try to parse as JSON
     try {
@@ -188,6 +206,14 @@ CHỈ TRẢ VỀ JSON.`;
       updateState({ errorEditing: 'Vui lòng nhập nội dung truyện cần biên tập.' });
       return;
     }
+
+    // Check and consume credit
+    const hasCredits = await consumeCredit(2); // 2 credits for editing + analysis
+    if (!hasCredits) {
+      updateState({ errorEditing: 'Không đủ credit để thực hiện thao tác này! Cần 2 credit để biên tập và phân tích.' });
+      return;
+    }
+
     updateState({ 
         isLoadingEditing: true, 
         errorEditing: null, 
@@ -231,6 +257,13 @@ CHỈ TRẢ VỀ JSON.`;
     }
     if (!refinementInstruction.trim()) {
       updateState({ furtherRefinementError: "Vui lòng nhập yêu cầu tinh chỉnh thêm." });
+      return;
+    }
+
+    // Check and consume credit
+    const hasCredits = await consumeCredit(1);
+    if (!hasCredits) {
+      updateState({ furtherRefinementError: 'Không đủ credit để tinh chỉnh thêm!' });
       return;
     }
     updateState({ isRefiningFurther: true, furtherRefinementError: null });
@@ -295,6 +328,14 @@ CHỈ TRẢ VỀ JSON.`;
     const validItems = batchInputItems.filter(item => item.originalStory.trim() !== '');
     if (validItems.length === 0) {
       updateState({ batchEditError: 'Vui lòng thêm ít nhất một truyện hợp lệ để biên tập hàng loạt.' });
+      return;
+    }
+
+    // Check and consume credits (2 credits per item: editing + analysis)
+    const requiredCredits = validItems.length * 2;
+    const hasCredits = await consumeCredit(requiredCredits);
+    if (!hasCredits) {
+      updateState({ batchEditError: `Không đủ credit để thực hiện thao tác này! Cần ${requiredCredits} credit cho ${validItems.length} truyện.` });
       return;
     }
     
