@@ -18,61 +18,98 @@ export interface AIResponse {
   remainingCredits?: number;
 }
 
+// Utility function for retry with exponential backoff
+const retryWithBackoff = async <T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 2,
+  baseDelay: number = 1000
+): Promise<T> => {
+  let lastError;
+  
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry on certain errors
+      if (error.message?.includes('unauthorized') || error.message?.includes('forbidden')) {
+        throw error;
+      }
+      
+      // If this was the last attempt, throw the error
+      if (i === maxRetries) {
+        break;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      const delay = baseDelay * Math.pow(2, i);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      console.log(`Retrying request... Attempt ${i + 2}/${maxRetries + 1}`);
+    }
+  }
+  
+  throw lastError;
+};
+
 // Hàm chính để gọi AI qua webadmin backend
 export const generateTextViaBackend = async (
   request: AIRequest,
   updateCreditFunction: (newCredit: number) => void
 ): Promise<AIResponse> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+  return retryWithBackoff(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/ai/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
-      },
-      body: JSON.stringify(request),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    let data;
     try {
-      data = await response.json();
-    } catch (parseError) {
-      // Handle non-JSON responses (like HTML error pages from proxy)
-      if (response.status === 504) {
-        throw new Error('Server timeout - please try again in a moment');
+      const response = await fetch(`${API_BASE_URL}/ai/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
+        },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // Handle non-JSON responses (like HTML error pages from proxy)
+        if (response.status === 504) {
+          throw new Error('Server timeout - please try again in a moment');
+        }
+        throw new Error(`Server error (${response.status}): ${response.statusText}`);
       }
-      throw new Error(`Server error (${response.status}): ${response.statusText}`);
-    }
 
-    if (!response.ok) {
-      if (response.status === 504) {
-        throw new Error('Server timeout - please try again in a moment');
+      if (!response.ok) {
+        if (response.status === 504) {
+          throw new Error('Server timeout - please try again in a moment');
+        }
+        throw new Error(data.error || data.message || `Server error: ${response.status}`);
       }
-      throw new Error(data.error || data.message || `Server error: ${response.status}`);
-    }
 
-    if (data.success && typeof data.remainingCredits === 'number') {
-      updateCreditFunction(data.remainingCredits);
-    }
+      if (data.success && typeof data.remainingCredits === 'number') {
+        updateCreditFunction(data.remainingCredits);
+      }
 
-    return data;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    
-    if (error.name === 'AbortError') {
-      console.error('Request timeout:', error);
-      throw new Error('Request timeout - please try again');
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        console.error('Request timeout:', error);
+        throw new Error('Request timeout - please try again');
+      }
+      
+      console.error('Error calling AI via backend:', error);
+      throw error;
     }
-    
-    console.error('Error calling AI via backend:', error);
-    throw error;
-  }
+  }, 2); // Retry up to 2 times
 };
 
 // Wrapper function để tương thích với các module cũ
@@ -146,52 +183,54 @@ export const generateImageViaBackend = async (
   aspectRatio: string = "16:9",
   provider: 'gemini' | 'stability' = 'gemini'
 ): Promise<{ success: boolean; imageData?: string; error?: string }> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout for images
+  return retryWithBackoff(async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout for images
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/ai/generate-image`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
-      },
-      body: JSON.stringify({
-        prompt,
-        aspectRatio,
-        provider,
-      }),
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/generate-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('user_key')}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          aspectRatio,
+          provider,
+        }),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      if (response.status === 504) {
+      if (!response.ok) {
+        if (response.status === 504) {
+          throw new Error('Image generation timeout - please try again');
+        }
+        
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          throw new Error(`Server error (${response.status}): ${response.statusText}`);
+        }
+        
+        throw new Error(errorData.message || 'Image generation failed');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        console.error('Image generation timeout:', error);
         throw new Error('Image generation timeout - please try again');
       }
       
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch (parseError) {
-        throw new Error(`Server error (${response.status}): ${response.statusText}`);
-      }
-      
-      throw new Error(errorData.message || 'Image generation failed');
+      console.error('Error calling image generation via backend:', error);
+      throw error;
     }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    
-    if (error.name === 'AbortError') {
-      console.error('Image generation timeout:', error);
-      throw new Error('Image generation timeout - please try again');
-    }
-    
-    console.error('Error calling image generation via backend:', error);
-    throw error;
-  }
+  }, 1); // Only retry once for images due to longer processing time
 }; 
