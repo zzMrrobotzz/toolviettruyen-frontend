@@ -141,28 +141,26 @@ const App: React.FC = () => {
   const [writeStoryState, setWriteStoryState] = useState<WriteStoryModuleState>(initialWriteStoryState);
 
   const initialRewriteState: RewriteModuleState = {
-    quick: {
-      rewriteLevel: 50,
-      sourceLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
-      targetLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
-      rewriteStyle: REWRITE_STYLE_OPTIONS[0].value,
-      customRewriteStyle: '',
-      adaptContext: false,
-      originalText: '',
-      rewrittenText: '',
+    rewriteLevel: 50,
+    sourceLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
+    targetLanguage: HOOK_LANGUAGE_OPTIONS[0].value,
+    rewriteStyle: REWRITE_STYLE_OPTIONS[0].value,
+    customRewriteStyle: '',
+    adaptContext: false,
+    originalText: '',
+    rewrittenText: '',
+    error: null,
+    progress: 0,
+    loadingMessage: null,
+    isProcessing: false,
+    isEditing: false,
+    editError: null,
+    editLoadingMessage: null,
+    hasBeenEdited: false,
+    translation: {
+      translatedText: null,
+      isTranslating: false,
       error: null,
-      progress: 0,
-      loadingMessage: null,
-      isProcessing: false,
-      isEditing: false,
-      editError: null,
-      editLoadingMessage: null,
-      hasBeenEdited: false,
-      translation: {
-        translatedText: null,
-        isTranslating: false,
-        error: null,
-      },
     },
   };
 
@@ -417,17 +415,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const stateToSave: Partial<RewriteModuleState> = { ...rewriteState };
-    // Remove temporary states from quick tab
-    if (stateToSave.quick) {
-      delete stateToSave.quick.rewrittenText;
-      delete stateToSave.quick.loadingMessage;
-      delete stateToSave.quick.progress;
-      delete stateToSave.quick.isEditing;
-      delete stateToSave.quick.editError;
-      delete stateToSave.quick.editLoadingMessage;
-      delete stateToSave.quick.hasBeenEdited;
-      delete stateToSave.quick.error;
-    }
+    // Remove temporary states
+    delete stateToSave.rewrittenText;
+    delete stateToSave.loadingMessage;
+    delete stateToSave.progress;
+    delete stateToSave.isEditing;
+    delete stateToSave.editError;
+    delete stateToSave.editLoadingMessage;
+    delete stateToSave.hasBeenEdited;
+    delete stateToSave.error;
 
     localStorage.setItem('rewriteModuleState_v1', JSON.stringify(stateToSave));
   }, [rewriteState]);

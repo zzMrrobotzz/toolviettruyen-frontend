@@ -234,8 +234,8 @@ export interface WriteStoryModuleState {
   };
 }
 
-// Rewrite Module with advanced features
-export interface QuickRewriteState {
+// Simplified Rewrite Module (Single Quick Rewrite)
+export interface RewriteModuleState {
   rewriteLevel: number;
   sourceLanguage: string;
   targetLanguage: string;
@@ -257,31 +257,6 @@ export interface QuickRewriteState {
     isTranslating: boolean;
     error: string | null;
   };
-}
-
-export type RewriteActiveTab = 'quick' | 'restructure';
-export type RewriteGoal = 'changeStyle' | 'changePerspective' | 'summarize' | 'expand' | 'changeGenre';
-
-export interface RestructureRewriteState {
-    step: 'planning' | 'reviewing' | 'completed';
-    originalText: string;
-    goal: RewriteGoal;
-    perspectiveCharacter: string;
-    targetGenre: string;
-    customTargetGenre: string;
-    targetStyle: string;
-    customTargetStyle: string;
-    rewritePlan: string;
-    rewrittenText: string;
-    isLoading: boolean;
-    loadingMessage: string | null;
-    error: string | null;
-}
-
-export interface RewriteModuleState {
-  activeTab: RewriteActiveTab;
-  quick: QuickRewriteState;
-  restructure: RestructureRewriteState;
 }
 
 
