@@ -138,7 +138,6 @@ ${textChunk}
 Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ngôn ngữ ${selectedTargetLangLabel}. Đảm bảo đầu ra toàn diện và chi tiết ít nhất bằng bản gốc. Không bao gồm bất kỳ văn bản, giới thiệu, hoặc giải thích nào khác.
 `;
                 
-                await delay(500);
                 const request = { 
                     prompt, 
                     provider: apiSettings?.provider || 'gemini',
