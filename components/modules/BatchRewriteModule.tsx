@@ -125,82 +125,203 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     textGenerator: (prompt: string, systemInstruction?: string, signal?: AbortSignal) => Promise<string>,
     signal: AbortSignal
   ): Promise<{ rewrittenText: string, characterMapUsed: string | null }> => {
-    const CHUNK_REWRITE_CHAR_COUNT = 20000; 
+    const CHUNK_REWRITE_CHAR_COUNT = 4000; 
     const numChunks = Math.ceil(textToRewrite.length / CHUNK_REWRITE_CHAR_COUNT);
-    let fullRewrittenText = '';
+    let fullRewrittenStory = '';
+    let characterMapForItem: string | null = null; 
+
+    const selectedSourceLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentSourceLanguage)?.label || currentSourceLanguage;
+    const selectedTargetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentTargetLanguage)?.label || currentTargetLanguage;
     
-    // Use the actual language values for AI consistency
-    const selectedSourceLangLabel = currentSourceLanguage;
-    const selectedTargetLangLabel = currentTargetLanguage;
+    const systemInstructionForRewrite = "You are an expert multilingual text rewriting AI. Your primary function is to transform input text according to precise instructions, ensuring that when a rewrite is requested (degree of change > 0%), the output is a modified version of the input, not the original input itself.";
 
     for (let i = 0; i < numChunks; i++) {
+       if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
       onProgress(itemId, 'rewriting', `Đang viết lại phần ${i + 1}/${numChunks}...`);
       const chunkStart = i * CHUNK_REWRITE_CHAR_COUNT;
       const chunkEnd = chunkStart + CHUNK_REWRITE_CHAR_COUNT;
       const textChunk = textToRewrite.substring(chunkStart, chunkEnd);
 
-      const effectiveStyle = currentRewriteStyleSettingValue === 'custom' ? userProvidedCustomInstructions : REWRITE_STYLE_OPTIONS.find(opt => opt.value === currentRewriteStyleSettingValue)?.label || currentRewriteStyleSettingValue;
-
-      const levelDescriptions: {[key: number]: string} = {
-          0: 'chỉ sửa lỗi chính tả và ngữ pháp. Giữ nguyên 100% câu chuyện gốc.',
-          25: 'thực hiện một số thay đổi về từ ngữ và cấu trúc câu để làm mới văn bản, đồng thời giữ nguyên ý nghĩa và cốt truyện gốc.',
-          50: 'viết lại vừa phải về từ ngữ và văn phong. Bạn có thể thay đổi cấu trúc câu và từ vựng, nhưng PHẢI giữ lại tên nhân vật chính và các điểm cốt truyện cốt lõi.',
-          75: 'sáng tạo lại câu chuyện. Bạn có thể thay đổi tên nhân vật và một số bối cảnh. Cốt truyện có thể có những diễn biến mới, nhưng PHẢI giữ lại tinh thần của kịch bản gốc.',
-          100: 'viết lại hoàn toàn thành một kịch bản mới. Chỉ giữ lại "linh hồn" (ý tưởng cốt lõi, chủ đề chính) của câu chuyện gốc.'
+       const levelDescriptions: {[key: number]: string} = {
+          0: 'only fix spelling and grammar. Keep the original story 100%. The output MUST be the full text of the chunk after applying these fixes (if any).',
+          25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning, characters, settings, and plot. The goal is a light refreshment. You are required to produce a rewritten version of this chunk. The output MUST ALWAYS be the full text of the chunk *after you have applied these revisions*. Do not return the original text if changes, however minor, are instructed.',
+          50: 'moderately rewrite the wording and style. You can change sentence structures, vocabulary, and some minor descriptive details (e.g., character\'s age, specific objects, minor traits of secondary characters). However, you MUST keep the main character names, core plot points, main occupations, and primary settings of the original text. You are required to produce a rewritten version of this chunk. The output MUST ALWAYS be the full text of the chunk *after you have applied these revisions*, even if the revisions seem moderate rather than extensive. Do not return the original text.',
+          75: 'creatively reimagine the story. You can change character names, occupations, and settings. The plot may have new developments, but it MUST retain the spirit, message, and most appealing points of the original script. You are required to produce a rewritten version of this chunk. The output MUST ALWAYS be the full text of the chunk *after you have applied these creative revisions*. Do not return the original text.',
+          100: 'completely rewrite into a new script. Only retain the "soul" (core idea, main theme) of the original story. Everything else, such as character names, settings, professions, and even some subplots, must be completely new. You are required to produce a rewritten version of this chunk. The output MUST ALWAYS be the full text of the chunk *after you have applied this complete rewrite*. Do not return the original text.'
       };
       const descriptionKey = Math.round(currentRewriteLevel / 25) * 25;
       const levelDescription = levelDescriptions[descriptionKey];
       
       let localizationRequest = '';
       if (currentTargetLanguage !== currentSourceLanguage && currentAdaptContext) {
-          localizationRequest = `\n- **Bản địa hóa văn hóa:** Điều chỉnh sâu sắc bối cảnh văn hóa, chuẩn mực xã hội, tên riêng và các chi tiết khác để câu chuyện có cảm giác tự nhiên và phù hợp với khán giả nói tiếng ${selectedTargetLangLabel}.`;
+          localizationRequest = `\n- **Cultural Localization Required:** Do not just translate. Deeply adapt the cultural context, social norms, proper names, and other details to make the story feel natural and appropriate for a ${selectedTargetLangLabel}-speaking audience.`;
       }
 
-      // *** NEW SIMPLIFIED PROMPT (ADAPTED FROM REWRITEMODULE) ***
-      const prompt = `Bạn là một AI chuyên gia viết lại văn bản đa ngôn ngữ.
-Nhiệm vụ của bạn là viết lại đoạn văn bản được cung cấp theo các hướng dẫn sau.
-
-**HƯỚNG DẪN:**
-- **Ngôn ngữ nguồn:** ${selectedSourceLangLabel}
-- **Ngôn ngữ đích:** ${selectedTargetLangLabel}
-- **Mức độ thay đổi:** ${currentRewriteLevel}%. Điều này có nghĩa là bạn nên ${levelDescription}.
-- **Yêu cầu về độ dài (QUAN TRỌG):** Đầu ra đã viết lại của bạn PHẢI dài ít nhất bằng văn bản gốc. Duy trì cùng một mức độ chi tiết và sự phong phú trong tường thuật. KHÔNG rút ngắn hoặc tóm tắt nội dung.
-- **Phong cách viết lại:** ${effectiveStyle}.
-- **Xử lý dấu thời gian (QUAN TRỌNG):** Các dấu thời gian (ví dụ: (11:42), 06:59, HH:MM:SS) trong văn bản gốc là siêu dữ liệu và PHẢI KHÔNG được bao gồm trong đầu ra đã viết lại.
-- **Tính nhất quán:** Đoạn văn được viết lại PHẢI duy trì tính nhất quán logic với ngữ cảnh từ các đoạn đã viết lại trước đó. Tên nhân vật, một khi đã được thiết lập, không được thay đổi.
-${localizationRequest}
-
-**Ngữ cảnh từ các đoạn trước (đã ở ngôn ngữ ${selectedTargetLangLabel}):**
----
-${fullRewrittenText || "Đây là đoạn đầu tiên."}
----
-
-**Đoạn văn bản gốc cần viết lại (đoạn này bằng ngôn ngữ ${selectedSourceLangLabel}):**
----
-${textChunk}
----
-
-**YÊU CẦU ĐẦU RA:**
-Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ngôn ngữ ${selectedTargetLangLabel}. Đảm bảo đầu ra toàn diện và chi tiết ít nhất bằng bản gốc. Không bao gồm bất kỳ văn bản, giới thiệu, hoặc giải thích nào khác.
-`;
+      let rewriteStyleInstructionPromptSegment = '';
+      if (currentRewriteStyleSettingValue === 'custom') {
+        rewriteStyleInstructionPromptSegment = `Apply the following custom rewrite instructions. These instructions are PARAMOUNT and OVERRIDE the general rules of the 'Degree of Change Required' when there is a direct conflict.
+ - For example, if the 'Degree of Change' for 50% says 'keep main character names', but your custom instruction says 'change the main character's name to Dra. Carmen Valdés', you MUST change the name to 'Dra. Carmen Valdés'.
+ - Similarly, if the text mentions '20 years of experience' and your custom instruction is to maintain persona details, you MUST keep '20 years of experience' unless explicitly told to change it.
+Your Custom Instructions: "${userProvidedCustomInstructions}"`;
+      } else {
+        rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${currentRewriteStyleSettingValue}.`;
+      }
       
-      if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
-      const result = await textGenerator(prompt, undefined, signal);
+      const lengthFidelityInstruction = `\n- **GUIDANCE ON OUTPUT LENGTH:** Your primary task is to REWRITE according to the 'Degree of Change Required'. The rewritten chunk should generally reflect the narrative scope and detail of the original.
+    \n  - For Degree of Change 0-25%: Aim for the output length to be reasonably close (e.g., +/-15%) to the original chunk's character count. However, making the required textual changes (even if minimal) as per the degree's description is MORE IMPORTANT than strictly adhering to this length if a conflict arises. DO NOT return original text if 'Degree of Change Required' is greater than 0.
+    \n  - For Degree of Change 50%: Aim for a length within +/-25% of the original. Focus on meaningful rewriting as per the degree.
+    \n  - For Degree of Change 75-100%: Length can vary significantly based on the creative changes, but the output must be a developed narrative segment. A 100% rewrite may be shorter if it's a thematic reinterpretation.
+    \n  In all cases where 'Degree of Change Required' is greater than 0%, prioritize executing the rewrite as instructed over returning an unchanged text due to length concerns. Avoid drastic, unexplained shortening unless it's a 100% rewrite or explicitly instructed by custom rewrite instructions.`;
+
+
+      let characterConsistencyInstructions = `
+          \n  - **ABSOLUTE CHARACTER NAME CONSISTENCY (FOR ALL CHARACTERS):**
+              \n    - **General Rule:** Once a name is established for ANY character (main, secondary, minor, recurring) in the \`${selectedTargetLangLabel}\` output of THIS SPECIFIC REWRITE SESSION, that name MUST be used with 100% consistency for that character throughout ALL subsequent parts of this same story. DO NOT change it later.
+              \n    - **If Target Language Differs from Source Language AND Rewrite Level < 75%:** For each character, you MUST choose ONE consistent form in \`${selectedTargetLangLabel}\` (either a standard direct translation or the original name if more appropriate phonetically) upon their first appearance in the rewritten text, AND THEN USE THAT CHOSEN FORM WITH ABSOLUTE CONSISTENCY. No random variations.
+              \n    - **(Specific rules for Character Map at Level >= 75% are detailed below).**`;
+
+      let prompt = `**Primary Objective:** Your main goal is to actively REWRITE the input text chunk. The extent and nature of the rewrite are determined by the 'Degree of Change Required' and the 'Rewrite Style Application' instructions below. You MUST produce a rewritten version. Only if the 'Degree of Change Required' is 0% AND the text has absolutely no errors to fix, should you return the original text verbatim. For any other degree of change, a rewritten output is mandatory.
+
+      \n**CRITICAL NARRATIVE INTEGRITY (SINGLE TRUTH MANDATE):** You are rewriting ONE SINGLE STORY. All details regarding characters (names, roles, relationships, established traits), plot points, events, locations, and timelines MUST remain ABSOLUTELY CONSISTENT with what has been established in previously rewritten chunks of THIS SAME STORY (provided as \`fullRewrittenStory\` context, which is THE CANON for this session) and the initial setup of the current chunk. DO NOT introduce conflicting information or alter established facts. Maintain ONE UNIFIED AND LOGICAL NARRATIVE THREAD.
+
+      \n**Your Task:** Rewrite the provided text chunk.
+      \n**Critical Output Requirement:** Your response for this task MUST BE ONLY the rewritten text itself, in the specified Target Language. NO other text, introductions, explanations, or meta-comments are allowed.
+      \n**Rewrite Instructions:**
+      \n- **Source Language (of the input text):** ${selectedSourceLangLabel}
+      \n- **Target Language (for the output text):** ${selectedTargetLangLabel}
+      \n- **Degree of Change Required:** ${currentRewriteLevel}%. This means you should ${levelDescription}. Ensure your changes strictly adhere to the permissions of this level (e.g., if the level states 'main character names...MUST be kept', then they MUST NOT be changed).
+      ${lengthFidelityInstruction}
+      \n- **Rewrite Style Application:** ${rewriteStyleInstructionPromptSegment}
+      \n- **Timestamp Handling:** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
+      ${localizationRequest}
+      \n- **Overall Story Coherence (CRITICAL - Builds on Narrative Integrity):**
+          \n  - **Persona Consistency:** Pay close attention to key details that define a character's persona, such as their stated years of experience, specific titles (Dr., Prof.), or recurring personal details. These details MUST be maintained with 100% consistency throughout the entire rewritten text, unless a custom instruction explicitly directs you to change them.
+          \n  - **Logical Flow:** The rewritten chunk MUST maintain logical consistency internally and with \`fullRewrittenStory\`.
+          \n  - **Character Consistency (General Behavior & Names):** ${characterConsistencyInstructions}
+          \n  - **Event, Setting & Situation Coherence:** Ensure events, locations, and plot-relevant objects are plausible and consistent with established facts (from \`fullRewrittenStory\` and the original chunk's premise), respecting the "Degree of Change". Once a setting or event detail is established in the rewrite, stick to it.
+      \n- **Context from Previous Chunks (THE CANON - must be in ${selectedTargetLangLabel}):**
+          \n  \`${fullRewrittenStory || "This is the first chunk. No previous context."}\`
+      `;
+      
+      if (i === 0 && currentRewriteLevel >= 75) {
+          prompt += ` \n\n**Character Mapping (MANDATORY for First Chunk if Level >= 75%):**
+          \nYour primary goal for character names is consistency in the ${selectedTargetLangLabel} output.
+          \nIdentify ALL character names (main, secondary, recurring) that YOU, the AI, are PURPOSEFULLY and CREATIVELY altering from their form in the ${selectedSourceLangLabel} text to a new, distinct form in your ${selectedTargetLangLabel} rewritten text for THIS CHUNK. This includes significant re-spellings, translations that are creative choices rather than direct equivalents, or entirely new names. For each such change, record it.
+          \nAt the VERY END of your entire response for THIS CHUNK, append these changes in the format:
+          \n"[CHARACTER_MAP]Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 1 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 1; Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 2 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 2[/CHARACTER_MAP]"
+          \nIf you make NO such purposeful creative changes to ANY character names (i.e., they are kept original, or receive only direct, standard translations that will be applied consistently per the general character consistency rule), you MUST append:
+          \n"[CHARACTER_MAP]Không có thay đổi tên nhân vật chính nào được map[/CHARACTER_MAP]"
+          \nThis map (or the 'no change' signal) is VITAL for consistency in subsequent chunks. This instruction and its output are ONLY for this first chunk and MUST be outside the main rewritten story text.`;
+      } else if (characterMapForItem && currentRewriteLevel >= 75) { // Use characterMapForItem here
+          prompt += `\n- **ABSOLUTE CHARACTER CONSISTENCY MANDATE (Based on Character Map for Level >= 75%):**
+          \n  You are provided with a Character Map: \`${characterMapForItem}\`. You MUST adhere to this with 100% accuracy.
+          \n  - If the map provides \`Tên Gốc (trong ${selectedSourceLangLabel}): [Tên A] -> Tên Mới (trong ${selectedTargetLangLabel}): [Tên B]\` pairs: Use the 'New Name' \`[Tên B]\` EXACTLY AS SPECIFIED for every instance (explicit or implied) of the 'Original Name' \`[Tên A]\`.
+          \n  - If the map states \`Không có thay đổi tên nhân vật chính nào được map\`: You MUST continue using the exact naming convention for ALL characters as established in the first rewritten chunk.
+          \n  - **FOR ALL CHARACTERS (mapped or not): Once a name is used for a character in the \`${selectedTargetLangLabel}\` output for this story, IT MUST NOT CHANGE for that character in subsequent parts of this same story.** DO NOT re-translate, vary, or introduce alternative names for any character already named.
+          \n  - **Handling Unmapped Names (if map exists and is not "no change"):** For ANY character name encountered in the original text that is NOT explicitly listed in the Character Map (and the map is not 'Không có thay đổi...'), you MUST: 1. Check if this character has already appeared in previously rewritten chunks (\`fullRewrittenStory\`). If yes, use the EXACT SAME name (in \`${selectedTargetLangLabel}\`) as used before. 2. If it's a new character not in the map and not seen before, apply a consistent, direct translation to \`${selectedTargetLangLabel}\` or maintain the original name if phonetically suitable, and then USE THIS CHOSEN FORM CONSISTENTLY for all future appearances of this character.`;
+      }
+
+      prompt += `\n**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**
+      \n---
+      \n${textChunk}
+      \n---
+      \n**IMPORTANT FINAL INSTRUCTION FOR THIS CHUNK:**
+      \nRegardless of the complexity or perceived difficulty of the rewrite task based on the 'Degree of Change Required' and other constraints, if 'Degree of Change Required' is greater than 0%, your output for THIS CHUNK ABSOLUTELY MUST BE A REWRITTEN VERSION. It CANNOT be an identical copy of the 'Original Text Chunk to Rewrite' provided above. Make your best effort to apply the changes as instructed. If the 'Degree of Change Required' is 0%, only fix basic spelling/grammar and return the full text; otherwise, you must rewrite.
+      \n**Perform the rewrite for THIS CHUNK ONLY in ${selectedTargetLangLabel}. Adhere strictly to all instructions. Remember, ONLY the rewritten story text.**`;
+
+      if (i > 0) await delay(750);
+      const result = await textGenerator(prompt, systemInstructionForRewrite, signal);
       let partResultText = result || "";
 
+      if (i === 0 && currentRewriteLevel >= 75) {
+          const mapMatch = partResultText.match(/\[CHARACTER_MAP\]([\s\S]*?)\[\/CHARACTER_MAP\]/);
+          if (mapMatch && mapMatch[1]) {
+              if (mapMatch[1].trim().toLowerCase() !== 'no change' && mapMatch[1].trim().toLowerCase() !== 'no main character name changes mapped' && mapMatch[1].trim().toLowerCase() !== 'không có thay đổi tên nhân vật chính nào được map') {
+                   characterMapForItem = mapMatch[1].trim();
+              } else {
+                  characterMapForItem = "Không có thay đổi tên nhân vật chính nào được map";
+              }
+              onProgress(itemId, 'rewriting', `Đang viết lại phần ${i + 1}/${numChunks}...`, characterMapForItem); // Pass char map in progress
+              partResultText = partResultText.replace(mapMatch[0], '');
+          }
+      }
       partResultText = partResultText.trim(); 
 
-      if (fullRewrittenText && partResultText) {
-          fullRewrittenText += "\n\n" + partResultText;
+      if (fullRewrittenStory && partResultText) {
+          fullRewrittenStory += "\n\n" + partResultText;
       } else if (partResultText) {
-          fullRewrittenText = partResultText;
+          fullRewrittenStory = partResultText;
       }
     }
-    // Return null for characterMapUsed as it's no longer part of the simplified logic
-    return { rewrittenText: fullRewrittenText.trim(), characterMapUsed: null };
+    return { rewrittenText: fullRewrittenStory.trim(), characterMapUsed: characterMapForItem };
   };
   
-  // REMOVED performSingleItemPostEdit function entirely
+  // Core post-rewrite editing logic (adapted from RewriteModule)
+  const performSingleItemPostEdit = async (
+    textToEdit: string,
+    originalSourceTextToCompare: string, // The item's original text
+    currentRewriteLevel: number,
+    currentSourceLanguage: string,
+    currentTargetLanguage: string,
+    currentRewriteStyle: string, // The actual style string (e.g., label or custom text)
+    currentAdaptContext: boolean,
+    itemId: string, // For progress updates
+    onProgress: (itemId: string, status: GeneratedBatchRewriteOutputItem['status'], message: string | null) => void,
+    textGenerator: (prompt: string, systemInstruction?: string, signal?: AbortSignal) => Promise<string>,
+    signal: AbortSignal
+  ): Promise<string> => {
+    onProgress(itemId, 'editing', 'Đang tinh chỉnh logic...');
+    if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
+    
+    const selectedSourceLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentSourceLanguage)?.label || currentSourceLanguage;
+    const selectedTargetLangLabel = HOOK_LANGUAGE_OPTIONS.find(opt => opt.value === currentTargetLanguage)?.label || currentTargetLanguage;
+
+    const editPrompt = `Bạn là một biên tập viên truyện chuyên nghiệp, cực kỳ tỉ mỉ và có khả năng tinh chỉnh văn phong xuất sắc. Nhiệm vụ của bạn là đọc kỹ "Văn Bản Đã Viết Lại" dưới đây. Mục tiêu chính của bạn là BIÊN TẬP và TINH CHỈNH văn bản này để nó trở nên mạch lạc, logic, nhất quán, và ĐẶC BIỆT là loại bỏ mọi sự trùng lặp, thừa thãi, đồng thời cải thiện văn phong cho súc tích và hấp dẫn hơn. Bạn sẽ SO SÁNH, ĐỐI CHIẾU "Văn Bản Đã Viết Lại" với "Văn Bản Gốc Ban Đầu" CHỦ YẾU để đảm bảo các yếu tố cốt lõi (nhân vật, tình tiết chính) được giữ lại một cách hợp lý theo "Mức Độ Thay Đổi Yêu Cầu" của lần viết lại trước, chứ KHÔNG phải để đưa văn bản trở lại y hệt bản gốc.
+
+    **QUAN TRỌNG: Văn bản "Đã Viết Lại" có thể đã được thay đổi ở một mức độ nhất định so với "Văn Bản Gốc" (dựa trên Mức Độ Thay Đổi Yêu Cầu). Việc biên tập của bạn KHÔNG PHẢI là đưa nó trở lại giống hệt bản gốc, mà là đảm bảo BÊN TRONG chính "Văn Bản Đã Viết Lại" đó phải nhất quán và logic, đồng thời vẫn tôn trọng những thay đổi có chủ đích đã được thực hiện (nếu có) so với bản gốc trong phạm vi cho phép của mức độ viết lại.**
+
+    **THÔNG TIN CHO BỐI CẢNH BIÊN TẬP:**
+    - Ngôn ngữ Văn Bản Gốc: ${selectedSourceLangLabel}
+    - Ngôn ngữ Văn Bản Đã Viết Lại (và ngôn ngữ đầu ra của bạn): ${selectedTargetLangLabel}
+    - Mức Độ Thay Đổi Yêu Cầu (của lần viết lại trước): ${currentRewriteLevel}%
+    - Phong Cách Viết Lại Yêu Cầu (của lần viết lại trước): ${currentRewriteStyle}
+    - Có yêu cầu bản địa hóa khi viết lại: ${currentAdaptContext ? 'Có' : 'Không'}
+
+    **VĂN BẢN GỐC BAN ĐẦU (để đối chiếu logic và các yếu tố gốc):**
+    ---
+    ${originalSourceTextToCompare}
+    ---
+
+    **VĂN BẢN ĐÃ VIẾT LẠI (Cần bạn biên tập và tinh chỉnh):**
+    ---
+    ${textToEdit}
+    ---
+
+    **HƯỚNG DẪN BIÊN TẬP CHI TIẾT:**
+    1.  **Tính nhất quán (Consistency):**
+        *   **Tên Nhân Vật (QUAN TRỌNG NHẤT):** Rà soát kỹ TOÀN BỘ "Văn Bản Đã Viết Lại". Đảm bảo MỖI nhân vật (dù chính hay phụ, dù được giới thiệu ở đâu) chỉ sử dụng MỘT TÊN DUY NHẤT và nhất quán trong toàn bộ văn bản bằng ngôn ngữ ${selectedTargetLangLabel}. Nếu có sự nhầm lẫn, thay đổi tên giữa chừng (ví dụ: nhân vật A lúc đầu tên là X, sau lại là Y), hãy sửa lại cho đúng một tên duy nhất đã được thiết lập (ưu tiên tên xuất hiện nhiều hơn hoặc hợp lý hơn).
+        *   **Đặc Điểm/Vai Trò Nhân Vật:** Đặc điểm ngoại hình, tính cách, vai trò, mối quan hệ của nhân vật có được duy trì nhất quán từ đầu đến cuối không? Có hành động nào của nhân vật mâu thuẫn với những gì đã được thiết lập về họ trong "Văn Bản Đã Viết Lại" không?
+        *   **Logic Cốt Truyện và Sự Kiện:** Các sự kiện có diễn ra hợp lý, tuần tự và logic không? Có tình tiết nào trong "Văn Bản Đã Viết Lại" bị vô lý, mâu thuẫn với các sự kiện trước đó trong chính nó, hoặc tạo ra "plot hole" không? Dòng thời gian có nhất quán không?
+        *   **Tính nhất quán Địa Điểm và Chi Tiết:** Địa điểm và các chi tiết bối cảnh quan trọng khác có được mô tả và duy trì nhất quán không?
+    2.  **NÂNG CAO CHẤT LƯỢNG VĂN PHONG VÀ LOẠI BỎ TRÙNG LẶP (RẤT QUAN TRỌNG):**
+        *   **Loại bỏ Trùng Lặp và Từ Ngữ Thừa:** Rà soát kỹ lưỡng để loại bỏ mọi sự lặp lại không cần thiết về ý tưởng, thông tin, cụm từ, hoặc mô tả. Nếu một chi tiết, sự kiện, hoặc suy nghĩ của nhân vật đã được nêu rõ, tránh diễn đạt lại theo cách tương tự hoặc mô tả lại các chi tiết không cần thiết ở những đoạn văn/câu sau, trừ khi có mục đích nhấn mạnh nghệ thuật đặc biệt và hiệu quả. Tìm cách cô đọng các đoạn văn dài dòng, loại bỏ từ ngữ thừa, câu văn rườm rà để nội dung súc tích và mạch lạc hơn.
+        *   **Cải thiện Luồng Chảy và Mạch Lạc (Flow and Cohesion):** Đảm bảo các đoạn văn và câu chuyện chuyển tiếp mượt mà, tự nhiên. Sử dụng từ nối, cụm từ chuyển tiếp một cách hợp lý và đa dạng nếu cần. Sắp xếp lại câu hoặc đoạn văn nếu điều đó cải thiện tính mạch lạc và dễ đọc tổng thể.
+        *   **Đa dạng hóa Cấu trúc Câu:** Tránh việc lặp đi lặp lại cùng một kiểu cấu trúc câu đơn điệu (ví dụ: liên tục các câu bắt đầu bằng chủ ngữ - động từ). Hãy thay đổi độ dài câu (ngắn, dài, trung bình) và các kiểu câu (đơn, ghép, phức) để tạo nhịp điệu và làm cho văn bản hấp dẫn, dễ theo dõi hơn.
+        *   **Tinh chỉnh Lựa chọn Từ ngữ (Word Choice):** Ưu tiên sử dụng từ ngữ chính xác, giàu hình ảnh, và có sức biểu cảm cao. Tránh các từ ngữ chung chung, sáo rỗng hoặc yếu nghĩa.
+        *   **Duy trì Giọng điệu và Phong cách Gốc (của bản viết lại):** Trong quá trình tinh chỉnh, cố gắng duy trì giọng điệu (ví dụ: căng thẳng, hài hước, trang trọng) và phong cách văn chương chung đã được thiết lập trong "Văn Bản Đã Viết Lại". Các chỉnh sửa về văn phong nên nhằm mục đích làm cho nó tốt hơn, không phải thay đổi hoàn toàn bản chất của nó.
+    3.  **Mạch Lạc và Dễ Hiểu Chung (Overall Clarity):** Sau các bước trên, đọc lại toàn bộ để đảm bảo văn bản cuối cùng mạch lạc, dễ hiểu, các ý được diễn đạt rõ ràng.
+    4.  **Độ Dài:** Cố gắng duy trì độ dài TƯƠNG TỰ như "Văn Bản Đã Viết Lại" được cung cấp. Việc chỉnh sửa chủ yếu tập trung vào logic, nhất quán và chất lượng văn phong, không phải thay đổi độ dài đáng kể, trừ khi thực sự cần thiết để sửa lỗi logic nghiêm trọng hoặc do việc loại bỏ trùng lặp/thừa thãi một cách tự nhiên dẫn đến thay đổi.
+
+    **ĐẦU RA:**
+    - Chỉ trả về TOÀN BỘ nội dung văn bản đã được biên tập và tinh chỉnh hoàn chỉnh, bằng ngôn ngữ ${selectedTargetLangLabel}.
+    - Không thêm bất kỳ lời bình luận, giải thích hay tiêu đề nào.`;
+
+    const systemInstructionForEdit = "You are a meticulous story editor. Your task is to refine and polish a given text, ensuring consistency, logical flow, and improved style, while respecting previous rewrite intentions.";
+    
+    await delay(1000);
+    const result = await textGenerator(editPrompt, systemInstructionForEdit, signal);
+    return result.trim();
+  };
 
   const processSingleBatchItem = async (
       item: BatchRewriteInputItem, 
@@ -240,7 +361,8 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
     }
 
     try {
-      const { rewrittenText } = await performSingleItemRewrite(
+      if (signal.aborted) throw new DOMException('Operation aborted by user.', 'AbortError');
+      const { rewrittenText: initiallyRewrittenText, characterMapUsed } = await performSingleItemRewrite(
         item.originalText,
         effectiveRewriteLevel,
         effectiveSourceLanguage,
@@ -249,28 +371,50 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
         customInstructionsForPrompt,
         effectiveAdaptContext,
         item.id,
-        (itemId, status, message) => { 
+        (itemId, status, message, charMap) => { // Updated progress callback
              updateResultCallback(itemId, { 
                 status: status, 
-                progressMessage: message,
+                progressMessage: message, 
+                ...(charMap && { characterMap: charMap }) // Store character map if provided
             });
         },
         textGenerator,
         signal
       );
       
-      // Removed the second 'editing' step. The process is now complete.
+      updateResultCallback(item.id, { rewrittenText: initiallyRewrittenText, progressMessage: 'Hoàn thành viết lại. Chuẩn bị tinh chỉnh...', characterMap: characterMapUsed, status: 'editing' });
+
+      if (signal.aborted) throw new DOMException('Operation aborted by user.', 'AbortError');
+
+      if (!initiallyRewrittenText.trim()) {
+        throw new Error("Văn bản viết lại ban đầu trống.");
+      }
+      
+      const finalRewrittenText = await performSingleItemPostEdit(
+        initiallyRewrittenText,
+        item.originalText,
+        effectiveRewriteLevel,
+        effectiveSourceLanguage,
+        effectiveTargetLanguage,
+        effectiveRewriteStyleForPrompt, // Use the same style context for editing
+        effectiveAdaptContext,
+        item.id,
+        (itemId, status, message) => updateResultCallback(itemId, { status: status, progressMessage: message }),
+        textGenerator,
+        signal
+      );
+
       updateResultCallback(item.id, { 
-        rewrittenText: rewrittenText, 
+        rewrittenText: finalRewrittenText, 
         status: 'completed', 
         progressMessage: 'Hoàn thành!', 
         error: null,
-        hasBeenEdited: true // Set to true as we now consider the single step as the final edit
+        hasBeenEdited: true
       });
 
       // Save to history after successful completion
-      if (rewrittenText.trim()) {
-        addToHistory('batch-rewrite', rewrittenText.trim(), {
+      if (finalRewrittenText.trim()) {
+        addToHistory('batch-rewrite', finalRewrittenText.trim(), {
           originalText: item.originalText,
           settings: {
             effectiveRewriteLevel,
@@ -410,6 +554,105 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
       if (abortControllerRef.current) {
           abortControllerRef.current.abort();
       }
+  };
+
+  const handleRefineSingleResult = async (resultId: string) => {
+    const resultItem = results.find(r => r.id === resultId);
+    const originalInputItem = inputItems.find(i => i.id === resultId);
+
+    if (!resultItem || !originalInputItem || !resultItem.rewrittenText) {
+        setModuleState(prev => ({
+            ...prev,
+            results: prev.results.map(r => r.id === resultId ? {...r, error: "Không tìm thấy dữ liệu để tinh chỉnh."} : r)
+        }));
+        return;
+    }
+    
+    // Create a temporary controller for this single operation.
+    const tempAbortController = new AbortController();
+    const signal = tempAbortController.signal;
+
+    setModuleState(prev => ({
+        ...prev,
+        isProcessingBatch: true,
+        results: prev.results.map(r => r.id === resultId ? {...r, status: 'editing', progressMessage: "Đang tinh chỉnh lại..."} : r)
+    }));
+    
+    const textGenerator = async (prompt: string, systemInstruction?: string, signal?: AbortSignal) => {
+       const request = {
+        prompt,
+        provider: apiSettings.provider || 'gemini',
+        model: apiSettings.model,
+        temperature: apiSettings.temperature,
+        maxTokens: apiSettings.maxTokens,
+      };
+      const result = await generateTextViaBackend(request, (newCredit) => {/* no-op */}, signal);
+      if (!result.success) throw new Error(result.error || 'AI generation failed');
+      return result.text || '';
+    };
+
+    // Determine effective settings for the item
+    const effectiveRewriteLevel = originalInputItem.specificRewriteLevel ?? globalRewriteLevel;
+    const effectiveSourceLanguage = originalInputItem.specificSourceLanguage ?? globalSourceLanguage;
+    const effectiveTargetLanguage = originalInputItem.specificTargetLanguage ?? globalTargetLanguage;
+    const effectiveRewriteStyleValue = originalInputItem.specificRewriteStyle ?? globalRewriteStyle;
+    const effectiveCustomRewriteStyle = originalInputItem.specificCustomRewriteStyle ?? globalCustomRewriteStyle;
+    
+    let effectiveAdaptContext;
+    if (originalInputItem.specificAdaptContext !== null && originalInputItem.specificAdaptContext !== undefined) {
+        effectiveAdaptContext = originalInputItem.specificAdaptContext;
+    } else {
+        effectiveAdaptContext = (effectiveTargetLanguage !== effectiveSourceLanguage) ? true : globalAdaptContext;
+    }
+    
+    let effectiveRewriteStyleForPrompt = '';
+    if (effectiveRewriteStyleValue === 'custom') {
+        if (!effectiveCustomRewriteStyle.trim()) {
+             setModuleState(prev => ({
+                ...prev,
+                isProcessingBatch: false,
+                results: prev.results.map(r => r.id === resultId ? {...r, status: 'error', error: "Lỗi: Phong cách tùy chỉnh trống.", progressMessage: "Lỗi"} : r)
+            }));
+            return;
+        }
+        effectiveRewriteStyleForPrompt = effectiveCustomRewriteStyle.trim(); // The custom text itself is the style
+    } else {
+        const selectedStyleOption = REWRITE_STYLE_OPTIONS.find(opt => opt.value === effectiveRewriteStyleValue);
+        effectiveRewriteStyleForPrompt = selectedStyleOption ? selectedStyleOption.label : effectiveRewriteStyleValue;
+    }
+
+    try {
+        const refinedText = await performSingleItemPostEdit(
+            resultItem.rewrittenText,
+            originalInputItem.originalText,
+            effectiveRewriteLevel,
+            effectiveSourceLanguage,
+            effectiveTargetLanguage,
+            effectiveRewriteStyleForPrompt,
+            effectiveAdaptContext,
+            resultId,
+            (itemId, status, message) => {
+                 setModuleState(prev => ({
+                    ...prev,
+                    results: prev.results.map(r => r.id === itemId ? {...r, status: status, progressMessage: message} : r)
+                }));
+            },
+            textGenerator,
+            signal
+        );
+        setModuleState(prev => ({
+            ...prev,
+            isProcessingBatch: false,
+            results: prev.results.map(r => r.id === resultId ? {...r, rewrittenText: refinedText, status: 'completed', progressMessage: "Tinh chỉnh lại hoàn tất!", hasBeenEdited: true, error: null} : r)
+        }));
+
+    } catch (e) {
+        setModuleState(prev => ({
+            ...prev,
+            isProcessingBatch: false,
+            results: prev.results.map(r => r.id === resultId ? {...r, status: 'error', error: `Lỗi tinh chỉnh lại: ${(e as Error).message}`, progressMessage: "Lỗi"} : r)
+        }));
+    }
   };
 
   const copyToClipboard = (text: string | null, buttonId: string) => {
@@ -639,6 +882,13 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
                         <div className="mt-2 space-x-2">
                             <button id={`copyBatchRewrite-${result.id}`} onClick={() => copyToClipboard(result.rewrittenText!, `copyBatchRewrite-${result.id}`)} className="px-3 py-1 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600">
                                 📋 Sao chép
+                            </button>
+                             <button 
+                                onClick={() => handleRefineSingleResult(result.id)} 
+                                disabled={isProcessingBatch || !result.rewrittenText} 
+                                className="px-3 py-1 bg-purple-500 text-white text-xs rounded-lg hover:bg-purple-600 disabled:opacity-50"
+                            >
+                                ✨ Tinh Chỉnh Lại Mục Này
                             </button>
                         </div>
                     </div>
