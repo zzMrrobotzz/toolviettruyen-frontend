@@ -754,10 +754,13 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
         }
     };
     
+    const [copyButtonText, setCopyButtonText] = useState('Sao chép');
+    
     const copyToClipboard = (text: string) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
-        alert("Đã sao chép!");
+        setCopyButtonText('Đã sao chép!');
+        setTimeout(() => setCopyButtonText('Sao chép'), 2000);
     };
     
     const anyLoading = isProcessing || isEditing;
@@ -845,7 +848,7 @@ const QuickRewriteTab: React.FC<QuickRewriteTabProps> = ({ apiSettings, state, u
                      <h3 className="text-lg font-semibold mb-2">Văn bản đã viết lại:</h3>
                      <textarea value={rewrittenText} readOnly rows={10} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"/>
                      <div className="mt-3 flex gap-2">
-                        <button onClick={() => copyToClipboard(rewrittenText)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Sao chép</button>
+                        <button onClick={() => copyToClipboard(rewrittenText)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">{copyButtonText}</button>
                         <button onClick={handlePostRewriteEdit} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600" disabled={anyLoading}>Biên Tập & Tinh Chỉnh Lại</button>
                      </div>
                  </div>
