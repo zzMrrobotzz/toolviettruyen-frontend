@@ -9,16 +9,18 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateTextWithJsonOutput } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
+import { ApiSettings } from '../../types';
 import { useAppContext } from '../../AppContext';
 
 interface NicheThemeExplorerModuleProps {
+  apiSettings: ApiSettings;
   moduleState: NicheThemeExplorerModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<NicheThemeExplorerModuleState>>;
 }
 
 const NicheThemeExplorerModule: React.FC<NicheThemeExplorerModuleProps> = ({ 
-    moduleState, setModuleState 
+    apiSettings, moduleState, setModuleState 
 }) => {
   const { consumeCredit } = useAppContext(); // Use context
   const {
@@ -31,7 +33,28 @@ const NicheThemeExplorerModule: React.FC<NicheThemeExplorerModuleProps> = ({
   };
 
   const generateJsonViaBackend = async <T,>(prompt: string): Promise<T> => {
-    return await generateTextWithJsonOutput<T>(prompt, 'You are a helpful assistant that returns valid JSON.', apiSettings?.apiKey);
+    const request = {
+      prompt,
+      provider: apiSettings?.provider || 'gemini',
+      model: apiSettings?.model,
+      temperature: apiSettings?.temperature,
+      maxTokens: apiSettings?.maxTokens,
+    };
+
+    const result = await generateTextViaBackend(request, (newCredit) => {
+      // Update credit if needed
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'AI generation failed');
+    }
+
+    // Try to parse as JSON
+    try {
+      return JSON.parse(result.text || '{}');
+    } catch (e) {
+      throw new Error('Failed to parse JSON response');
+    }
   };
 
   const handleAnalyzeAndExploreNiches = async () => {

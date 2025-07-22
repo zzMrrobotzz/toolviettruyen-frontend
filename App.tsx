@@ -654,6 +654,7 @@ const App: React.FC = () => {
                 />;
        case ActiveModule.NicheThemeExplorer:
         return <NicheThemeExplorerModule 
+                  apiSettings={apiSettings}
                   moduleState={nicheThemeExplorerState}
                   setModuleState={setNicheThemeExplorerState}
                 />;

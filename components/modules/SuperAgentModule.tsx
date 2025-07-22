@@ -6,8 +6,8 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateImage } from '../../services/geminiService';
-import { generateImageViaBackend } from '../../services/aiProxyService';
+import { generateTextViaBackend, generateImageViaBackend } from '../../services/aiProxyService';
+import { useAppContext } from '../../AppContext';
 import { fetchElevenLabsVoices, generateElevenLabsSpeech } from '../../services/elevenLabsService';
 import { delay } from '../../utils'; // Added delay import
 
@@ -29,6 +29,8 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
     generatedStory, generatedImages, generatedAudioUrl, ttsError, error
   } = moduleState;
 
+  const { consumeCredit } = useAppContext();
+  
   const updateState = (updates: Partial<SuperAgentModuleState>) => {
     setModuleState(prev => ({ ...prev, ...updates }));
   };
@@ -38,15 +40,42 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
   const [isFetchingVoicesLocal, setIsFetchingVoicesLocal] = useState(false); 
   const [currentAbortController, setCurrentAbortController] = useState<AbortController | null>(null);
 
+  const generateTextLocal = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings, signal?: AbortSignal) => {
+    const request = {
+      prompt,
+      provider: apiSettings?.provider || 'gemini',
+      model: apiSettings?.model,
+      temperature: apiSettings?.temperature,
+      maxTokens: apiSettings?.maxTokens,
+    };
 
-  // No longer need apiKey since we're using aiProxyService
+    const result = await generateTextViaBackend(request, (newCredit) => {
+      // Update credit if needed
+    }, signal);
 
-  const generateTextLocal = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
-    return await generateText(prompt, systemInstruction, false, apiSettings?.apiKey);
+    if (!result.success) {
+      throw new Error(result.error || 'AI generation failed');
+    }
+
+    return { text: result.text || '' };
   };
 
-  const generateImageLocal = async (prompt: string, aspectRatio: string = "16:9", apiSettings?: ApiSettings) => {
-    return await generateImage(prompt, aspectRatio, apiSettings?.apiKey);
+  const generateImageLocal = async (prompt: string, aspectRatio: string = "16:9", apiSettings?: ApiSettings, signal?: AbortSignal) => {
+    const request = {
+      prompt,
+      aspectRatio,
+      provider: apiSettings?.provider || 'gemini',
+    };
+
+    const result = await generateImageViaBackend(request, (newCredit) => {
+      // Update credit if needed
+    }, signal);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Image generation failed');
+    }
+
+    return { base64Image: result.base64Image || '' };
   };
 
   const handleFetchVoices = useCallback(async () => {
@@ -110,14 +139,14 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
         storyPrompt = `Dựa vào dàn ý sau, hãy viết một câu chuyện hoàn chỉnh khoảng ${wordCount} từ. Chỉ trả về câu chuyện hoàn chỉnh:\n\n${sourceText}`;
       } else {
         setLoadingMessage('Bước 1/4 (P1): Đang tạo dàn ý từ tiêu đề...');
-        const outlineResult = await generateTextLocal(`Hãy viết một dàn ý chi tiết cho truyện ngắn với tiêu đề: "${sourceText}".`, undefined, undefined, apiSettings);
+        const outlineResult = await generateTextLocal(`Hãy viết một dàn ý chi tiết cho truyện ngắn với tiêu đề: "${sourceText}".`, undefined, undefined, apiSettings, abortController.signal);
         if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         await delay(1000, abortController.signal); 
         setLoadingMessage('Bước 1/4 (P2): Đang viết truyện từ dàn ý...');
         storyPrompt = `Dựa vào dàn ý sau, hãy viết một câu chuyện hoàn chỉnh khoảng ${wordCount} từ. Chỉ trả về câu chuyện hoàn chỉnh:\n\n${outlineResult.text}`;
       }
       
-      const storyResult = await generateTextLocal(storyPrompt, undefined, undefined, apiSettings);
+      const storyResult = await generateTextLocal(storyPrompt, undefined, undefined, apiSettings, abortController.signal);
       if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       updateState({ generatedStory: storyResult.text });
       await delay(1000, abortController.signal); 
@@ -125,7 +154,7 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
       setLoadingMessage(`Bước 2/4: Đang tạo ${imageCount} prompt ảnh...`);
       
       const imagePromptsQuery = `Dựa trên câu chuyện sau, hãy tạo ra ${imageCount} prompt ảnh bằng tiếng Anh để minh họa cho các cảnh quan trọng. Mỗi prompt phải chi tiết, sống động, thích hợp cho model text-to-image Imagen3. Mỗi prompt trên một dòng riêng biệt, không có đầu mục "Prompt X:".\n\nTRUYỆN (chỉ dùng phần đầu để tham khảo nếu truyện quá dài):\n${storyResult.text.substring(0, 3000)}`;
-      const imagePromptsResult = await generateTextLocal(imagePromptsQuery, undefined, undefined, apiSettings);
+      const imagePromptsResult = await generateTextLocal(imagePromptsQuery, undefined, undefined, apiSettings, abortController.signal);
       if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const prompts = imagePromptsResult.text.split('\n').filter(p => p.trim() !== '').slice(0, imageCount);
       await delay(1000, abortController.signal); 
@@ -135,9 +164,9 @@ const SuperAgentModule: React.FC<SuperAgentModuleProps> = ({
         if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
         setLoadingMessage(`Bước 3/4: Đang tạo ảnh ${i + 1}/${prompts.length}...`);
         if (i > 0) await delay(1500, abortController.signal); 
-        const imageB64 = await generateImageLocal(prompts[i], aspectRatio, apiSettings);
+        const imageResult = await generateImageLocal(prompts[i], aspectRatio, apiSettings, abortController.signal);
         if (abortController.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-        images.push(imageB64);
+        images.push(imageResult.base64Image);
         updateState({ generatedImages: [...images] }); 
       }
       

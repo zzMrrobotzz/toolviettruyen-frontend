@@ -9,7 +9,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 
 interface CharacterStudioModuleProps {
   apiSettings: ApiSettings;
@@ -144,17 +144,32 @@ const CharacterStudioModule: React.FC<CharacterStudioModuleProps> = ({
     }
     
     try {
-      const result = await generateText(userPrompt, systemInstruction, false, apiSettings?.apiKey);
+      const request = {
+        prompt: userPrompt,
+        provider: apiSettings?.provider || 'gemini',
+        model: apiSettings?.model,
+        temperature: apiSettings?.temperature,
+        maxTokens: apiSettings?.maxTokens,
+      };
+
+      const result = await generateTextViaBackend(request, (newCredit) => {
+        // Update credit if needed
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
       if (isRefinement) {
           updateState({ 
-              generatedBaseCharacterPrompt: result.text.trim(), 
+              generatedBaseCharacterPrompt: (result.text || '').trim(), 
               isLoadingRefinementForBasePrompt: false, 
               errorRefinementForBasePrompt: null,
               refinementInstructionForBasePrompt: '', // Clear instruction after successful refinement
           });
       } else {
           updateState({ 
-              generatedBaseCharacterPrompt: result.text.trim(), 
+              generatedBaseCharacterPrompt: (result.text || '').trim(), 
               isLoadingBasePrompt: false, 
               progressMessageBasePrompt: `Hoàn thành! Đã tạo Mô tả Nhân vật Cốt lõi.`, 
               errorBasePrompt: null 
@@ -226,9 +241,24 @@ Output ONLY the complete image prompt in ${selectedFinalOutputLangLabel}. Do not
 `;
 
     try {
-              const result = await generateText(userPrompt, systemInstruction, false, apiSettings?.apiKey);
+      const request = {
+        prompt: userPrompt,
+        provider: apiSettings?.provider || 'gemini',
+        model: apiSettings?.model,
+        temperature: apiSettings?.temperature,
+        maxTokens: apiSettings?.maxTokens,
+      };
+
+      const result = await generateTextViaBackend(request, (newCredit) => {
+        // Update credit if needed
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
       updateState({ 
-          generatedCompleteImagePrompt: result.text.trim(), 
+          generatedCompleteImagePrompt: (result.text || '').trim(), 
           isLoadingCompletePrompt: false, 
           progressMessageCompletePrompt: `Hoàn thành! Prompt tạo ảnh hoàn chỉnh đã sẵn sàng.`, 
           errorCompletePrompt: null 
