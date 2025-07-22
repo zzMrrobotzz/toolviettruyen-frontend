@@ -35,6 +35,19 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
 
     const { consumeCredit } = useAppContext();
 
+    // Tính toán maxTokens động dựa trên độ dài văn bản
+    const calculateMaxTokens = (inputText: string): number => {
+        const wordCount = inputText.trim().split(/\s+/).length;
+        
+        // Công thức: maxTokens = wordCount × 2.5 + buffer
+        // Tỷ lệ: 1 từ tiếng Việt ≈ 1.5-2 tokens, output thường dài hơn input
+        if (wordCount < 1000) return 4096;      // Văn bản ngắn
+        if (wordCount < 3000) return 8192;      // Văn bản trung bình  
+        if (wordCount < 8000) return 16384;     // Văn bản dài
+        if (wordCount < 15000) return 32768;    // Văn bản rất dài
+        return 65536; // Maximum cho văn bản cực dài (>15k từ)
+    };
+
     // Wrapper function to match other modules pattern
     const generateText = async (
         prompt: string,
@@ -43,12 +56,18 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         apiSettings?: ApiSettings,
         signal?: AbortSignal
     ) => {
+        // Sử dụng maxTokens từ apiSettings nếu được chỉ định (cho edit), 
+        // nếu không thì tính động dựa trên originalText
+        const dynamicMaxTokens = apiSettings?.maxTokens || calculateMaxTokens(originalText);
+        
         const request = {
             prompt,
+            systemInstruction,
             provider: apiSettings?.provider || 'gemini',
             model: apiSettings?.model,
-            temperature: apiSettings?.temperature,
-            maxTokens: apiSettings?.maxTokens,
+            temperature: apiSettings?.temperature || 0.7,
+            maxTokens: dynamicMaxTokens, // Sử dụng maxTokens tự động
+            useGoogleSearch: false
         };
 
         const result = await generateTextViaBackend(request, (newCredit) => {
@@ -98,7 +117,17 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
             return;
         }
 
-        updateState({ error: null, rewrittenText: '', progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false });
+        // Tính và hiển thị thông tin maxTokens
+        const wordCount = originalText.trim().split(/\s+/).length;
+        const calculatedMaxTokens = calculateMaxTokens(originalText);
+        
+        updateState({ 
+            error: null, 
+            rewrittenText: '', 
+            progress: 0, 
+            loadingMessage: `Đang chuẩn bị... (${wordCount} từ → maxTokens: ${calculatedMaxTokens})`, 
+            hasBeenEdited: false 
+        });
         
         const CHUNK_CHAR_COUNT = 4000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
@@ -255,7 +284,16 @@ Return ONLY the fully edited and polished text. Do not add any commentary or exp
 `;
         
         try {
-            const result = await generateText(editPrompt, undefined, false, apiSettings);
+            // Tính maxTokens dựa trên văn bản đã viết lại để tinh chỉnh
+            const editMaxTokens = calculateMaxTokens(rewrittenText);
+            
+            // Tạo apiSettings với maxTokens động cho edit
+            const enhancedApiSettings = {
+                ...apiSettings,
+                maxTokens: editMaxTokens
+            };
+            
+            const result = await generateText(editPrompt, undefined, false, enhancedApiSettings);
             updateState({ rewrittenText: result.text || '', isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true });
         } catch (e) {
             updateState({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });

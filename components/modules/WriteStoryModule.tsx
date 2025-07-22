@@ -27,19 +27,39 @@ interface WriteStoryModuleProps {
 const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, moduleState, setModuleState, retrievedViralOutlineFromAnalysis }) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   
+  // Tính toán maxTokens động dựa trên độ dài văn bản
+  const calculateMaxTokens = (inputText: string): number => {
+    const wordCount = inputText.trim().split(/\s+/).length;
+    
+    // Công thức: maxTokens = wordCount × 2.5 + buffer
+    // Tỷ lệ: 1 từ tiếng Việt ≈ 1.5-2 tokens, output thường dài hơn input
+    if (wordCount < 1000) return 4096;      // Văn bản ngắn
+    if (wordCount < 3000) return 8192;      // Văn bản trung bình  
+    if (wordCount < 8000) return 16384;     // Văn bản dài
+    if (wordCount < 15000) return 32768;    // Văn bản rất dài
+    return 65536; // Maximum cho văn bản cực dài (>15k từ)
+  };
+
   const generateText = async (
     prompt: string,
     systemInstruction?: string,
     useJsonOutput?: boolean,
     apiSettings?: ApiSettings,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    textForTokenCalculation?: string
   ) => {
+    // Tính maxTokens động, ưu tiên từ apiSettings, sau đó từ textForTokenCalculation, cuối cùng là default
+    const dynamicMaxTokens = apiSettings?.maxTokens || 
+                             (textForTokenCalculation ? calculateMaxTokens(textForTokenCalculation) : 8192);
+    
     const request = {
       prompt,
+      systemInstruction,
       provider: apiSettings?.provider || 'gemini',
       model: apiSettings?.model,
-      temperature: apiSettings?.temperature,
-      maxTokens: apiSettings?.maxTokens,
+      temperature: apiSettings?.temperature || 0.7,
+      maxTokens: dynamicMaxTokens,
+      useGoogleSearch: false
     };
 
     const result = await generateTextViaBackend(request, (newCredit) => {
@@ -189,7 +209,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     \n---`;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, apiSettings, signal);
+      const result = await generateText(prompt, undefined, undefined, apiSettings, signal, storyInputForHook);
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const text = typeof result === 'string' ? result : result.text;
       updateState({ generatedHooks: text, hookLoadingMessage: "Tạo hook hoàn tất!" });
@@ -299,7 +319,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
         \nBắt đầu viết phần tiếp theo (bằng ${outputLanguageLabel}):`;
 
         if (i > 0) await delay(1000, signal); 
-        const result = await generateText(prompt, undefined, undefined, apiSettings, signal);
+        const result = await generateText(prompt, undefined, undefined, apiSettings, signal, storyOutline);
         if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
         let currentChunkText = result.text;
         if (i === 0) {
@@ -417,7 +437,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     Không thêm bất kỳ lời bình, giới thiệu, hay tiêu đề nào.`;
 
     try {
-      const result = await generateText(prompt, undefined, undefined, apiSettings, signal);
+      const result = await generateText(prompt, undefined, undefined, apiSettings, signal, generatedStory);
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const text = typeof result === 'string' ? result : result.text;
       updateState({ 
@@ -471,7 +491,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     const prompt = `Translate the following text to Vietnamese. Provide only the translated text, without any additional explanations or context.\n\nText to translate:\n"""\n${generatedStory.trim()}\n"""`;
 
     try {
-        const result = await generateText(prompt, undefined, false, apiSettings);
+        const result = await generateText(prompt, undefined, false, apiSettings, undefined, generatedStory);
         updateStoryTranslationState({ translatedText: result.text.trim() });
     } catch (e) {
         console.error("Story Translation Error:", e);
@@ -519,7 +539,7 @@ const WriteStoryModule: React.FC<WriteStoryModuleProps> = ({ apiSettings, module
     \n- The lesson must be written in **${selectedOutputLangLabel}**. ${ctaLessonSegment}
     \n- Return only the lesson text. No introductions or other text.`;
     try {
-      const result = await generateText(prompt, undefined, undefined, apiSettings, signal);
+      const result = await generateText(prompt, undefined, undefined, apiSettings, signal, storyInputForLesson);
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const text = typeof result === 'string' ? result : result.text;
       updateState({ generatedLesson: text, lessonLoadingMessage: "Đúc kết bài học hoàn tất!" });

@@ -55,13 +55,33 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     setModuleState(prev => ({ ...prev, ...updates }));
   };
 
-  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal) => {
+  // Tính toán maxTokens động dựa trên độ dài văn bản
+  const calculateMaxTokens = (inputText: string): number => {
+    const wordCount = inputText.trim().split(/\s+/).length;
+    
+    // Công thức: maxTokens = wordCount × 2.5 + buffer
+    // Tỷ lệ: 1 từ tiếng Việt ≈ 1.5-2 tokens, output thường dài hơn input
+    if (wordCount < 1000) return 4096;      // Văn bản ngắn
+    if (wordCount < 3000) return 8192;      // Văn bản trung bình  
+    if (wordCount < 8000) return 16384;     // Văn bản dài
+    if (wordCount < 15000) return 32768;    // Văn bản rất dài
+    return 65536; // Maximum cho văn bản cực dài (>15k từ)
+  };
+
+  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal, textForTokenCalculation?: string) => {
+    // Tính maxTokens động dựa trên văn bản outline
+    const dynamicMaxTokens = textForTokenCalculation 
+      ? calculateMaxTokens(textForTokenCalculation)
+      : apiSettings?.maxTokens || 8192;
+    
     const request = {
       prompt,
+      systemInstruction,
       provider: apiSettings?.provider || 'gemini',
       model: apiSettings?.model,
-      temperature: apiSettings?.temperature,
-      maxTokens: apiSettings?.maxTokens,
+      temperature: apiSettings?.temperature || 0.7,
+      maxTokens: dynamicMaxTokens,
+      useGoogleSearch: false
     };
 
     const result = await generateTextViaBackend(request, (newCredit) => {
@@ -75,13 +95,20 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     return result.text || '';
   };
 
-  const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal): Promise<T> => {
+  const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal, textForTokenCalculation?: string): Promise<T> => {
+    // Tính maxTokens động dựa trên văn bản outline
+    const dynamicMaxTokens = textForTokenCalculation 
+      ? calculateMaxTokens(textForTokenCalculation)
+      : apiSettings?.maxTokens || 8192;
+      
     const request = {
       prompt,
+      systemInstruction,
       provider: apiSettings?.provider || 'gemini',
       model: apiSettings?.model,
-      temperature: apiSettings?.temperature,
-      maxTokens: apiSettings?.maxTokens,
+      temperature: apiSettings?.temperature || 0.7,
+      maxTokens: dynamicMaxTokens,
+      useGoogleSearch: false
     };
 
     const result = await generateTextViaBackend(request, (newCredit) => {
@@ -133,10 +160,10 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
   ): Promise<Omit<GeneratedBatchStoryOutputItem, 'id' | 'originalOutline'>> => {
     
     // --- Define service functions based on provider ---
-    const textGenerator = (prompt: string) => generateText(prompt, undefined, apiSettings, signal);
+    const textGenerator = (prompt: string, textForTokens?: string) => generateText(prompt, undefined, apiSettings, signal, textForTokens);
     
-    const jsonGenerator = <T,>(prompt: string): Promise<T> => {
-        return generateTextWithJsonOutput<T>(prompt, undefined, apiSettings, signal);
+    const jsonGenerator = <T,>(prompt: string, textForTokens?: string): Promise<T> => {
+        return generateTextWithJsonOutput<T>(prompt, undefined, apiSettings, signal, textForTokens);
     };
 
 
@@ -175,7 +202,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
             ---`;
             await delay(500);
             if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
-            const keyElementResultText = await textGenerator(keyElementPrompt);
+            const keyElementResultText = await textGenerator(keyElementPrompt, item.outline);
             if (keyElementResultText.trim()) {
                 keyElementsFromOutline = keyElementResultText.trim();
             }
@@ -206,7 +233,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
         
         if (i > 0) await delay(1000);
         if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
-        const resultText = await textGenerator(storyPrompt);
+        const resultText = await textGenerator(storyPrompt, item.outline);
         fullStory += (fullStory ? '\n\n' : '') + resultText.trim();
     }
      if (!fullStory.trim()) {
@@ -251,7 +278,7 @@ const BatchStoryWritingModule: React.FC<BatchStoryWritingModuleProps> = ({
     Hãy trả về TOÀN BỘ câu chuyện đã biên tập bằng ${outputLanguageLabel}. Không giới thiệu, không tiêu đề.`;
 
     if (signal.aborted) throw new DOMException('Operation aborted', 'AbortError');
-    const editedStory = await textGenerator(editPrompt);
+    const editedStory = await textGenerator(editPrompt, fullStory);
     if (!editedStory.trim()) {
         throw new Error("Không thể biên tập truyện.");
     }

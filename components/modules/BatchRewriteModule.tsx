@@ -45,13 +45,33 @@ const BatchRewriteModule: React.FC<BatchRewriteModuleProps> = ({ apiSettings, mo
     setModuleState(prev => ({ ...prev, ...updates }));
   };
   
-  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal) => {
+  // Tính toán maxTokens động dựa trên độ dài văn bản
+  const calculateMaxTokens = (inputText: string): number => {
+    const wordCount = inputText.trim().split(/\s+/).length;
+    
+    // Công thức: maxTokens = wordCount × 2.5 + buffer
+    // Tỷ lệ: 1 từ tiếng Việt ≈ 1.5-2 tokens, output thường dài hơn input
+    if (wordCount < 1000) return 4096;      // Văn bản ngắn
+    if (wordCount < 3000) return 8192;      // Văn bản trung bình  
+    if (wordCount < 8000) return 16384;     // Văn bản dài
+    if (wordCount < 15000) return 32768;    // Văn bản rất dài
+    return 65536; // Maximum cho văn bản cực dài (>15k từ)
+  };
+  
+  const generateText = async (prompt: string, systemInstruction?: string, apiSettings?: ApiSettings, signal?: AbortSignal, textForTokenCalculation?: string) => {
+    // Tính maxTokens động dựa trên văn bản cần rewrite
+    const dynamicMaxTokens = textForTokenCalculation 
+      ? calculateMaxTokens(textForTokenCalculation)
+      : apiSettings?.maxTokens || 8192;
+    
     const request = {
       prompt,
+      systemInstruction,
       provider: apiSettings?.provider || 'gemini',
       model: apiSettings?.model,
-      temperature: apiSettings?.temperature,
-      maxTokens: apiSettings?.maxTokens,
+      temperature: apiSettings?.temperature || 0.7,
+      maxTokens: dynamicMaxTokens,
+      useGoogleSearch: false
     };
 
     const result = await generateTextViaBackend(request, (newCredit) => {
@@ -230,7 +250,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
       \n**Perform the rewrite for THIS CHUNK ONLY in ${selectedTargetLangLabel}. Adhere strictly to all instructions. Remember, ONLY the rewritten story text.**`;
 
       if (i > 0) await delay(750);
-      const result = await textGenerator(prompt, systemInstructionForRewrite, signal);
+      const result = await textGenerator(prompt, systemInstructionForRewrite, signal, textChunk);
       let partResultText = result || "";
 
       if (i === 0 && currentRewriteLevel >= 75) {
@@ -319,7 +339,7 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
     const systemInstructionForEdit = "You are a meticulous story editor. Your task is to refine and polish a given text, ensuring consistency, logical flow, and improved style, while respecting previous rewrite intentions.";
     
     await delay(1000);
-    const result = await textGenerator(editPrompt, systemInstructionForEdit, signal);
+    const result = await textGenerator(editPrompt, systemInstructionForEdit, signal, textToEdit);
     return result.trim();
   };
 
@@ -463,13 +483,20 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
 
     const CONCURRENCY_LIMIT = Math.max(1, Math.min(10, concurrencyLimit));
     
-    const textGenerator = async (prompt: string, systemInstruction?: string, signal?: AbortSignal) => {
+    const textGenerator = async (prompt: string, systemInstruction?: string, signal?: AbortSignal, originalText?: string) => {
+      // Tính maxTokens động dựa trên văn bản gốc
+      const dynamicMaxTokens = originalText 
+        ? calculateMaxTokens(originalText)
+        : apiSettings.maxTokens || 8192;
+      
       const request = {
         prompt,
+        systemInstruction,
         provider: apiSettings.provider || 'gemini',
         model: apiSettings.model,
-        temperature: apiSettings.temperature,
-        maxTokens: apiSettings.maxTokens,
+        temperature: apiSettings.temperature || 0.7,
+        maxTokens: dynamicMaxTokens,
+        useGoogleSearch: false
       };
 
       const result = await generateTextViaBackend(request, (newCredit) => {
@@ -578,13 +605,20 @@ Your Custom Instructions: "${userProvidedCustomInstructions}"`;
         results: prev.results.map(r => r.id === resultId ? {...r, status: 'editing', progressMessage: "Đang tinh chỉnh lại..."} : r)
     }));
     
-    const textGenerator = async (prompt: string, systemInstruction?: string, signal?: AbortSignal) => {
+    const textGenerator = async (prompt: string, systemInstruction?: string, signal?: AbortSignal, textForCalculation?: string) => {
+       // Tính maxTokens động dựa trên văn bản cần xử lý
+       const dynamicMaxTokens = textForCalculation 
+         ? calculateMaxTokens(textForCalculation)
+         : apiSettings.maxTokens || 8192;
+         
        const request = {
         prompt,
+        systemInstruction,
         provider: apiSettings.provider || 'gemini',
         model: apiSettings.model,
-        temperature: apiSettings.temperature,
-        maxTokens: apiSettings.maxTokens,
+        temperature: apiSettings.temperature || 0.7,
+        maxTokens: dynamicMaxTokens,
+        useGoogleSearch: false
       };
       const result = await generateTextViaBackend(request, (newCredit) => {/* no-op */}, signal);
       if (!result.success) throw new Error(result.error || 'AI generation failed');
