@@ -58,21 +58,11 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
 
     const [isProcessing, setIsProcessing] = React.useState(false);
     
-    // State for Character Map tracking
-    const [characterMapForSession, setCharacterMapForSession] = React.useState<string | null>(null);
+    // State for Character Map tracking - REMOVED FOR SIMPLICITY
+    // const [characterMapForSession, setCharacterMapForSession] = React.useState<string | null>(null);
 
-    // Helper function to extract character map from AI response
-    const extractCharacterMap = (aiResponse: string): string | null => {
-        const mapRegex = /\[CHARACTER_MAP\](.*?)\[\/CHARACTER_MAP\]/s;
-        const match = aiResponse.match(mapRegex);
-        return match ? match[1].trim() : null;
-    };
-
-    // Helper function to remove character map from AI response
-    const removeCharacterMapFromResponse = (aiResponse: string): string => {
-        return aiResponse.replace(/\[CHARACTER_MAP\].*?\[\/CHARACTER_MAP\]/s, '').trim();
-    };
-
+    // Helper functions for character map - REMOVED
+    
     // Tất cả các onChange input/select/slider chỉ gọi updateStateInput, không reset rewrittenText
     // Khi bấm nút Viết lại Văn bản, mới reset rewrittenText
     const handleSingleRewrite = async () => {
@@ -88,9 +78,8 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
             setIsProcessing(false);
             return;
         }
-        // Chỉ reset rewrittenText ở đây và reset character map
+        // Chỉ reset rewrittenText ở đây
         setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: '', error: null, progress: 0, loadingMessage: 'Đang chuẩn bị...', hasBeenEdited: false } }));
-        setCharacterMapForSession(null);
         
         const CHUNK_CHAR_COUNT = 4000;
         const numChunks = Math.ceil(originalText.length / CHUNK_CHAR_COUNT);
@@ -101,98 +90,62 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
                 updateStateInput({ progress: Math.round(((i + 1) / numChunks) * 100), loadingMessage: `Đang viết lại phần ${i + 1}/${numChunks}...` });
                 const textChunk = originalText.substring(i * CHUNK_CHAR_COUNT, (i + 1) * CHUNK_CHAR_COUNT);
                 
-                let effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
+                const effectiveStyle = rewriteStyle === 'custom' ? customRewriteStyle : REWRITE_STYLE_OPTIONS.find(opt => opt.value === rewriteStyle)?.label || rewriteStyle;
                 
                 const levelDescriptions: {[key: number]: string} = {
-                    0: 'only fix spelling and grammar. Keep the original story 100%.',
-                    25: 'make some changes to words and sentence structures to refresh the text, while strictly preserving the original meaning and plot.',
-                    50: 'moderately rewrite the wording and style. You can change sentence structures and vocabulary, but MUST keep the main character names and core plot points.',
-                    75: 'creatively reimagine the story. You can change character names and some settings. The plot may have new developments, but it MUST retain the spirit of the original script.',
-                    100: 'completely rewrite into a new script. Only retain the "soul" (core idea, main theme) of the original story.'
+                    0: 'chỉ sửa lỗi chính tả và ngữ pháp. Giữ nguyên 100% câu chuyện gốc.',
+                    25: 'thực hiện một số thay đổi về từ ngữ và cấu trúc câu để làm mới văn bản, đồng thời giữ nguyên ý nghĩa và cốt truyện gốc.',
+                    50: 'viết lại vừa phải về từ ngữ và văn phong. Bạn có thể thay đổi cấu trúc câu và từ vựng, nhưng PHẢI giữ lại tên nhân vật chính và các điểm cốt truyện cốt lõi.',
+                    75: 'sáng tạo lại câu chuyện. Bạn có thể thay đổi tên nhân vật và một số bối cảnh. Cốt truyện có thể có những diễn biến mới, nhưng PHẢI giữ lại tinh thần của kịch bản gốc.',
+                    100: 'viết lại hoàn toàn thành một kịch bản mới. Chỉ giữ lại "linh hồn" (ý tưởng cốt lõi, chủ đề chính) của câu chuyện gốc.'
                 };
                 const descriptionKey = Math.round(rewriteLevel / 25) * 25;
                 const levelDescription = levelDescriptions[descriptionKey];
 
-                // Use the actual language values (English, Vietnamese, etc.) for AI consistency
                 const selectedSourceLangLabel = sourceLanguage;
                 const selectedTargetLangLabel = targetLanguage;
 
                 let localizationRequest = '';
                 if (targetLanguage !== sourceLanguage && adaptContext) {
-                    localizationRequest = `\n- **Cultural Localization Required:** Deeply adapt the cultural context, social norms, proper names, and other details to make the story feel natural and appropriate for a ${selectedTargetLangLabel}-speaking audience.`;
+                    localizationRequest = `\n- **Bản địa hóa văn hóa:** Điều chỉnh sâu sắc bối cảnh văn hóa, chuẩn mực xã hội, tên riêng và các chi tiết khác để câu chuyện có cảm giác tự nhiên và phù hợp với khán giả nói tiếng ${selectedTargetLangLabel}.`;
                 }
 
-                let rewriteStyleInstructionPromptSegment = '';
-                if (rewriteStyle === 'custom') {
-                    rewriteStyleInstructionPromptSegment = `Apply the following custom rewrite instructions: "${customRewriteStyle}"`;
-                } else {
-                    rewriteStyleInstructionPromptSegment = `The desired rewrite style is: ${effectiveStyle}.`;
-                }
+                // *** NEW SIMPLIFIED PROMPT ***
+                const prompt = `Bạn là một AI chuyên gia viết lại văn bản đa ngôn ngữ.
+Nhiệm vụ của bạn là viết lại đoạn văn bản được cung cấp theo các hướng dẫn sau.
 
-                // Character consistency instructions based on rewrite level and chunk position
-                let characterConsistencyInstructions = '';
-                if (rewriteLevel >= 75) {
-                    if (i === 0) {
-                        // First chunk for high-level rewrite: needs character mapping
-                        characterConsistencyInstructions = `
-
-**Character Mapping (MANDATORY for First Chunk if Level >= 75%):**
-Your primary goal for character names is consistency in the ${selectedTargetLangLabel} output.
-Identify ALL character names (main, secondary, recurring) that YOU, the AI, are PURPOSEFULLY and CREATIVELY altering from their form in the ${selectedSourceLangLabel} text to a new, distinct form in your ${selectedTargetLangLabel} rewritten text for THIS CHUNK. This includes significant re-spellings, translations that are creative choices rather than direct equivalents, or entirely new names. For each such change, record it.
-At the VERY END of your entire response for THIS CHUNK, append these changes in the format:
-"[CHARACTER_MAP]Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 1 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 1; Tên Gốc (trong ${selectedSourceLangLabel}): Original Name 2 -> Tên Mới (trong ${selectedTargetLangLabel}): New Name 2[/CHARACTER_MAP]"
-If you make NO such purposeful creative changes to ANY character names (i.e., they are kept original, or receive only direct, standard translations that will be applied consistently per the general character consistency rule), you MUST append:
-"[CHARACTER_MAP]Không có thay đổi tên nhân vật chính nào được map[/CHARACTER_MAP]"
-This map (or the 'no change' signal) is VITAL for consistency in subsequent chunks. This instruction and its output are ONLY for this first chunk and MUST be outside the main rewritten story text.`;
-                    } else {
-                        // Subsequent chunks for high-level rewrite: use character map
-                        characterConsistencyInstructions = `
-
-**ABSOLUTE CHARACTER CONSISTENCY MANDATE (Based on Character Map for Level >= 75%):**
-You are provided with a Character Map: \`${characterMapForSession}\`. You MUST adhere to this with 100% accuracy.
-- If the map provides \`Original -> New\` pairs: Use the 'New Name' EXACTLY AS SPECIFIED for every instance of the 'Original Name'.
-- If the map states 'Không có thay đổi...': You MUST continue using the exact naming convention for ALL characters as established in the first rewritten chunk.
-- For ANY character not in the map, you MUST maintain the name used in the first rewritten chunk.
-- **DO NOT re-translate, vary, or introduce alternative names for any character already named.**`;
-                    }
-                } else {
-                    // Low/Mid-level rewrites: strengthen consistency
-                    characterConsistencyInstructions = `
-
-**CRITICAL NARRATIVE INTEGRITY (SINGLE TRUTH MANDATE):** You are rewriting ONE SINGLE STORY. All details regarding characters (names, roles, relationships), plot points, events, and locations MUST remain ABSOLUTELY CONSISTENT with what has been established in previously rewritten chunks (provided as context, which is THE CANON for this session). DO NOT introduce conflicting information. Maintain ONE UNIFIED AND LOGICAL NARRATIVE THREAD.
-- **ABSOLUTE CHARACTER NAME CONSISTENCY:** Once a name is established for ANY character in the \`${selectedTargetLangLabel}\` output, that name MUST be used with 100% consistency for that character throughout ALL subsequent parts. DO NOT change it later.`;
-                }
-
-                const prompt = `You are an expert multilingual text rewriting AI. Your task is to rewrite the provided text chunk according to the following instructions.
-
-**Instructions:**
-- **Source Language:** ${selectedSourceLangLabel}
-- **Target Language:** ${selectedTargetLangLabel}
-- **Degree of Change Required:** ${rewriteLevel}%. This means you should ${levelDescription}.
-- **Output Length Requirement (CRITICAL):** Your rewritten output MUST be at least as long as the original text, preferably 10-20% longer. Maintain the same level of detail, narrative richness, and descriptive elements. Do NOT shorten or summarize the content.
-- **Rewrite Style:** ${rewriteStyleInstructionPromptSegment}
-- **Timestamp Handling (CRITICAL):** Timestamps (e.g., (11:42), 06:59, HH:MM:SS) in the original text are metadata and MUST NOT be included in the rewritten output.
-- **Coherence:** The rewritten chunk MUST maintain logical consistency with the context from previously rewritten chunks.
+**HƯỚNG DẪN:**
+- **Ngôn ngữ nguồn:** ${selectedSourceLangLabel}
+- **Ngôn ngữ đích:** ${selectedTargetLangLabel}
+- **Mức độ thay đổi:** ${rewriteLevel}%. Điều này có nghĩa là bạn nên ${levelDescription}.
+- **Yêu cầu về độ dài (QUAN TRỌNG):** Đầu ra đã viết lại của bạn PHẢI dài ít nhất bằng văn bản gốc. Duy trì cùng một mức độ chi tiết và sự phong phú trong tường thuật. KHÔNG rút ngắn hoặc tóm tắt nội dung.
+- **Phong cách viết lại:** ${effectiveStyle}.
+- **Xử lý dấu thời gian (QUAN TRỌNG):** Các dấu thời gian (ví dụ: (11:42), 06:59, HH:MM:SS) trong văn bản gốc là siêu dữ liệu và PHẢI KHÔNG được bao gồm trong đầu ra đã viết lại.
+- **Tính nhất quán:** Đoạn văn được viết lại PHẢI duy trì tính nhất quán logic với ngữ cảnh từ các đoạn đã viết lại trước đó. Tên nhân vật, một khi đã được thiết lập, không được thay đổi.
 ${localizationRequest}
-${characterConsistencyInstructions}
 
-**Context from Previous Chunks (already in ${selectedTargetLangLabel}):**
+**Ngữ cảnh từ các đoạn trước (đã ở ngôn ngữ ${selectedTargetLangLabel}):**
 ---
-${fullRewrittenText || "This is the first chunk."}
+${fullRewrittenText || "Đây là đoạn đầu tiên."}
 ---
 
-**Original Text Chunk to Rewrite (this chunk is in ${selectedSourceLangLabel}):**
+**Đoạn văn bản gốc cần viết lại (đoạn này bằng ngôn ngữ ${selectedSourceLangLabel}):**
 ---
 ${textChunk}
 ---
 
-**Your Task:**
-Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLabel}. Ensure the output is comprehensive and at least as detailed as the original. Do not include any other text, introductions, or explanations.
+**YÊU CẦU ĐẦU RA:**
+Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ngôn ngữ ${selectedTargetLangLabel}. Đảm bảo đầu ra toàn diện và chi tiết ít nhất bằng bản gốc. Không bao gồm bất kỳ văn bản, giới thiệu, hoặc giải thích nào khác.
 `;
                 
-                await delay(500); // Simulate API call delay
-                // Gọi API với enhanced error handling
-                const request = { prompt, provider: apiSettings?.provider || 'gemini' };
+                await delay(500);
+                const request = { 
+                    prompt, 
+                    provider: apiSettings?.provider || 'gemini',
+                    model: apiSettings?.model,
+                    temperature: apiSettings?.temperature,
+                    maxTokens: apiSettings?.maxTokens,
+                };
                 let result;
                 try {
                     result = await generateTextViaBackend(request, (newCredit) => {});
@@ -210,25 +163,15 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
                     throw networkError;
                 }
                 
-                let chunkResult = (result.text || '').trim();
-                
-                // Extract character map if this is the first chunk of a high-level rewrite
-                if (i === 0 && rewriteLevel >= 75) {
-                    const extractedMap = extractCharacterMap(chunkResult);
-                    if (extractedMap) {
-                        setCharacterMapForSession(extractedMap);
-                        chunkResult = removeCharacterMapFromResponse(chunkResult);
-                    }
-                }
+                const chunkResult = (result.text || '').trim();
                 
                 fullRewrittenText += (fullRewrittenText ? '\n\n' : '') + chunkResult;
                 setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: fullRewrittenText } })); // Update UI progressively
             }
             setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: fullRewrittenText.trim() } }));
-            updateStateInput({ loadingMessage: 'Hoàn thành! Đang tự động biên tập...', progress: 100 });
+            updateStateInput({ loadingMessage: 'Hoàn thành!', progress: 100 });
             
-            // Tự động biên tập để đảm bảo tính nhất quán
-            await autoEditAfterRewrite(fullRewrittenText.trim());
+            // REMOVED autoEditAfterRewrite call
             
             // Save to history after successful completion
             if (fullRewrittenText.trim()) {
@@ -250,244 +193,14 @@ Provide ONLY the rewritten text for the current chunk in ${selectedTargetLangLab
         } catch (e) {
             updateStateInput({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
         } finally {
-            // Không xóa loadingMessage bằng setTimeout nữa
             updateStateInput({ loadingMessage: null });
             setIsProcessing(false);
         }
     };
 
-    const autoEditAfterRewrite = async (textToEdit: string) => {
-        try {
-            updateStateInput({ loadingMessage: 'Đang tự động biên tập để đảm bảo tính nhất quán...' });
-            
-            const fullEditPrompt = `You are a meticulous story editor with an eidetic memory. Your task is to find and fix every single consistency error in the "Văn Bản Đã Viết Lại". You will cross-reference it against the "Văn Bản Gốc Ban Đầu" and the "Character Map" to ensure perfect logical and narrative integrity.
+    // REMOVED autoEditAfterRewrite function entirely
 
-**CONTEXT FOR EDITING:**
-- Rewrite Level Previously Applied: ${rewriteLevel}%
-- Character Map Generated During Rewrite: \`${characterMapForSession || 'Không có'}\`
-
-**VĂN BẢN GỐC BAN ĐẦU (để đối chiếu logic và các yếu tố gốc):**
----
-${originalText}
----
-
-**VĂN BẢN ĐÃ VIẾT LẠI (Cần bạn biên tập và tinh chỉnh):**
----
-${textToEdit}
----
-
-**HƯỚNG DẪN BIÊN TẬP NGHIÊM NGẶT:**
-1.  **NHẤT QUÁN TÊN NHÂN VẬT (QUAN TRỌNG NHẤT):**
-    - Rà soát kỹ TOÀN BỘ "Văn Bản Đã Viết Lại". Đảm bảo MỖI nhân vật chỉ sử dụng MỘT TÊN DUY NHẤT.
-    - **Đối chiếu với Character Map:** Nếu map tồn tại, hãy đảm bảo mọi tên gốc trong "Văn Bản Gốc" đã được thay thế chính xác bằng tên mới từ map trong "Văn Bản Đã Viết Lại".
-    - **Đối chiếu với Văn Bản Gốc (nếu không có map hoặc level < 75%):** Đảm bảo tên nhân vật trong "Văn Bản Đã Viết Lại" là bản dịch/phiên âm nhất quán của tên trong "Văn Bản Gốc". Sửa lại bất kỳ sự thay đổi ngẫu nhiên nào.
-2.  **LOGIC CỐT TRUYỆN VÀ SỰ KIỆN:**
-    - So sánh các sự kiện chính giữa hai phiên bản. "Văn Bản Đã Viết Lại" có tạo ra "plot hole" hoặc mâu thuẫn với các sự kiện đã được thiết lập không? Sửa lại cho hợp lý.
-3.  **NHẤT QUÁN CHI TIẾT:**
-    - Kiểm tra các chi tiết nhỏ nhưng quan trọng (nghề nghiệp, tuổi tác, địa điểm, mối quan hệ). Chúng có nhất quán trong toàn bộ "Văn Bản Đã Viết Lại" không?
-4.  **CẢI THIỆN VĂN PHONG:**
-    - Loại bỏ các đoạn văn, câu chữ bị lặp lại không cần thiết.
-    - Cải thiện sự mượt mà, trôi chảy giữa các câu và đoạn văn.
-
-**ĐẦU RA BẮT BUỘC:**
-- Trả về TOÀN BỘ nội dung văn bản đã được biên tập (${textToEdit.length} ký tự) với MỌI chi tiết được bảo tồn.
-- Văn bản sau biên tập PHẢI có độ dài ít nhất ${Math.floor(textToEdit.length * 0.95)} ký tự.
-- KHÔNG được tóm tắt, cắt bỏ, hay viết "..." thay thế nội dung.
-- KHÔNG thêm bất kỳ lời bình luận hay giải thích nào.
-- CHỈ trả về văn bản hoàn chỉnh đã biên tập.
-`;
-
-            // Enhanced fallback prompt to prevent content truncation
-            const fallbackEditPrompt = `BẠN LÀ CHUYÊN GIA BIÊN TẬP CHUYÊN NGHIỆP. Nhiệm vụ của bạn là biên tập văn bản SAO CHO GIỮ NGUYÊN 100% NỘI DUNG VÀ ĐỘ DÀI.
-
-**VĂN BẢN THAM KHẢO GỐC:**
----
-${originalText}
----
-
-**VĂN BẢN CẦN BIÊN TẬP (${textToEdit.length} ký tự - PHẢI GIỮ NGUYÊN ĐỘ DÀI NÀY):**
----
-${textToEdit}
----
-
-**YÊU CẦU BIÊN TẬP NGHIÊM NGẶT:**
-1. **KHÔNG ĐƯỢC CẮT BỎ HOẶC TÓM TẮT**: Văn bản sau biên tập PHẢI có độ dài ít nhất ${Math.floor(textToEdit.length * 0.95)} ký tự.
-2. **GIỮ TẤT CẢ CẢNH VÀ ĐỐI THOẠI**: Mọi cảnh quay, cuộc hội thoại, chi tiết miêu tả đều PHẢI được giữ nguyên.
-3. **THỐNG NHẤT TÊN NHÂN VẬT**: Đảm bảo mỗi nhân vật chỉ dùng MỘT TÊN duy nhất trong toàn bộ văn bản.
-4. **LOGIC CỐT TRUYỆN**: Sửa các mâu thuẫn logic nhưng KHÔNG được xóa bất kỳ sự kiện nào.
-5. **CẢI THIỆN VĂN PHONG**: Chỉ sửa ngữ pháp, cách diễn đạt mà KHÔNG thay đổi nội dung.
-
-**LƯU Ý TUYỆT ĐỐI**: 
-- Trả về TOÀN BỘ văn bản đã biên tập với mọi chi tiết được bảo tồn.
-- Độ dài văn bản sau biên tập PHẢI tương đương với văn bản cần biên tập (${textToEdit.length} ký tự).
-- KHÔNG được viết phản hồi kiểu "Tôi cần thêm thông tin" hay "Bạn có thể cung cấp".
-- CHỈ trả về văn bản đã được biên tập hoàn chỉnh.`;
-
-            let result;
-            try {
-                // Try full prompt first with enhanced error handling
-                console.log(`🎯 Attempting auto-edit with full prompt (${fullEditPrompt.length} chars)`);
-                try {
-                    result = await generateTextViaBackend({ prompt: fullEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
-                    if (!result.success) throw new Error(result.error || 'Main prompt failed');
-                } catch (networkError) {
-                    const errorMsg = (networkError as Error).message;
-                    if (errorMsg.includes('Failed to fetch') || errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
-                        throw new Error('Backend connection interrupted');
-                    }
-                    throw networkError;
-                }
-            } catch (mainError) {
-                const errorMsg = (mainError as Error).message;
-                console.warn(`❌ Full prompt failed: ${errorMsg}`);
-                
-                // Only use fallback for specific errors (rate limits, token limits, network issues)
-                if (errorMsg.includes('rate limit') || 
-                    errorMsg.includes('token') || 
-                    errorMsg.includes('too long') ||
-                    errorMsg.includes('RATE_LIMIT_EXCEEDED') ||
-                    errorMsg.includes('502') || 
-                    errorMsg.includes('Bad Gateway') ||
-                    errorMsg.includes('Failed to fetch')) {
-                    
-                    console.log('🔄 Using enhanced fallback due to technical limitation...');
-                    updateStateInput({ loadingMessage: 'Prompt phức tạp, đang dùng phương án tối ưu...' });
-                    
-                    try {
-                        result = await generateTextViaBackend({ prompt: fallbackEditPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
-                        if (!result.success) throw new Error(result.error || 'Fallback prompt failed');
-                    } catch (fallbackNetworkError) {
-                        const fallbackErrorMsg = (fallbackNetworkError as Error).message;
-                        if (fallbackErrorMsg.includes('Failed to fetch') || fallbackErrorMsg.includes('502') || fallbackErrorMsg.includes('Bad Gateway')) {
-                            throw new Error('Backend không khả dụng. Vui lòng thử lại sau.');
-                        }
-                        throw fallbackNetworkError;
-                    }
-                } else {
-                    // For other errors, don't use fallback - just throw the original error
-                    throw mainError;
-                }
-            }
-            
-            if (!result.success) throw new Error(result.error || 'AI generation failed');
-            
-            // ✅ CRITICAL FIX: Kiểm tra chất lượng biên tập trước khi ghi đè
-            const editedText = result.text || '';
-            const originalLength = textToEdit.length;
-            const editedLength = editedText.length;
-            const lengthRatio = editedLength / originalLength;
-            
-            // Chỉ áp dụng biên tập nếu:
-            // 1. Độ dài tương đối (ít nhất 70% độ dài gốc)
-            // 2. Không phải là phản hồi generic/ngắn
-            const isValidEdit = lengthRatio >= 0.7 && 
-                               editedLength > 100 && 
-                               !editedText.includes('I need more specific') &&
-                               !editedText.includes('Please provide') &&
-                               !editedText.toLowerCase().includes('summarize') &&
-                               !editedText.toLowerCase().includes('không thể');
-            
-            if (isValidEdit) {
-                console.log(`✅ Auto-edit successful: ${originalLength} → ${editedLength} chars (${(lengthRatio * 100).toFixed(1)}%)`);
-                setModuleState(prev => ({ 
-                    ...prev, 
-                    quick: { 
-                        ...prev.quick, 
-                        rewrittenText: editedText,
-                        hasBeenEdited: true,
-                        loadingMessage: 'Biên tập tự động hoàn tất!'
-                    } 
-                }));
-            } else {
-                console.warn(`⚠️ Auto-edit quality check failed: ${originalLength} → ${editedLength} chars (${(lengthRatio * 100).toFixed(1)}%). Keeping original rewrite.`);
-                setModuleState(prev => ({ 
-                    ...prev, 
-                    quick: { 
-                        ...prev.quick, 
-                        hasBeenEdited: false, // Mark as NOT edited since we rejected the edit
-                        loadingMessage: 'Biên tập tự động không đạt chất lượng, giữ nguyên văn bản viết lại!'
-                    } 
-                }));
-            }
-            
-        } catch (e) {
-            console.error('❌ Auto edit completely failed:', e);
-            updateStateInput({ 
-                loadingMessage: 'Biên tập tự động không thể thực hiện, nhưng văn bản viết lại vẫn hoàn tất!',
-                editError: `Lỗi biên tập tự động: ${(e as Error).message}. Bạn có thể dùng nút "Biên Tập & Tinh Chỉnh" thủ công.` 
-            });
-        }
-    };
-
-    const handlePostRewriteEdit = async () => {
-         if (!rewrittenText.trim()) {
-            updateStateInput({ editError: 'Không có văn bản để tinh chỉnh.' });
-            return;
-        }
-        setIsProcessing(true);
-        updateStateInput({ isEditing: true, editError: null, editLoadingMessage: 'Đang tinh chỉnh logic...', hasBeenEdited: false });
-        
-        const editPrompt = `You are a meticulous story editor with an eidetic memory. Your task is to find and fix every single consistency error in the "Văn Bản Đã Viết Lại". You will cross-reference it against the "Văn Bản Gốc Ban Đầu" and the "Character Map" to ensure perfect logical and narrative integrity.
-
-**CONTEXT FOR EDITING:**
-- Rewrite Level Previously Applied: ${rewriteLevel}%
-- Character Map Generated During Rewrite: \`${characterMapForSession || 'Không có'}\`
-
-**VĂN BẢN GỐC BAN ĐẦU (để đối chiếu logic và các yếu tố gốc):**
----
-${originalText}
----
-
-**VĂN BẢN ĐÃ VIẾT LẠI (Cần bạn biên tập và tinh chỉnh):**
----
-${rewrittenText}
----
-
-**HƯỚNG DẪN BIÊN TẬP NGHIÊM NGẶT:**
-1.  **NHẤT QUÁN TÊN NHÂN VẬT (QUAN TRỌNG NHẤT):**
-    - Rà soát kỹ TOÀN BỘ "Văn Bản Đã Viết Lại". Đảm bảo MỖI nhân vật chỉ sử dụng MỘT TÊN DUY NHẤT.
-    - **Đối chiếu với Character Map:** Nếu map tồn tại, hãy đảm bảo mọi tên gốc trong "Văn Bản Gốc" đã được thay thế chính xác bằng tên mới từ map trong "Văn Bản Đã Viết Lại".
-    - **Đối chiếu với Văn Bản Gốc (nếu không có map hoặc level < 75%):** Đảm bảo tên nhân vật trong "Văn Bản Đã Viết Lại" là bản dịch/phiên âm nhất quán của tên trong "Văn Bản Gốc". Sửa lại bất kỳ sự thay đổi ngẫu nhiên nào.
-2.  **LOGIC CỐT TRUYỆN VÀ SỰ KIỆN:**
-    - So sánh các sự kiện chính giữa hai phiên bản. "Văn Bản Đã Viết Lại" có tạo ra "plot hole" hoặc mâu thuẫn với các sự kiện đã được thiết lập không? Sửa lại cho hợp lý.
-3.  **NHẤT QUÁN CHI TIẾT:**
-    - Kiểm tra các chi tiết nhỏ nhưng quan trọng (nghề nghiệp, tuổi tác, địa điểm, mối quan hệ). Chúng có nhất quán trong toàn bộ "Văn Bản Đã Viết Lại" không?
-4.  **CẢI THIỆN VĂN PHONG:**
-    - Loại bỏ các đoạn văn, câu chữ bị lặp lại không cần thiết.
-    - Cải thiện sự mượt mà, trôi chảy giữa các câu và đoạn văn.
-
-**ĐẦU RA BẮT BUỘC:**
-- Trả về TOÀN BỘ nội dung văn bản đã được biên tập (${textToEdit.length} ký tự) với MỌI chi tiết được bảo tồn.
-- Văn bản sau biên tập PHẢI có độ dài ít nhất ${Math.floor(textToEdit.length * 0.95)} ký tự.
-- KHÔNG được tóm tắt, cắt bỏ, hay viết "..." thay thế nội dung.
-- KHÔNG thêm bất kỳ lời bình luận hay giải thích nào.
-- CHỈ trả về văn bản hoàn chỉnh đã biên tập.
-`;
-        
-        try {
-            let result;
-            try {
-                result = await generateTextViaBackend({ prompt: editPrompt, provider: apiSettings?.provider || 'gemini' }, (newCredit) => {});
-                if (!result.success) throw new Error(result.error || 'AI generation failed');
-            } catch (networkError) {
-                const errorMsg = (networkError as Error).message;
-                if (errorMsg.includes('Failed to fetch') || errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
-                    throw new Error('Kết nối backend bị gián đoạn. Vui lòng thử lại sau vài giây.');
-                }
-                if (errorMsg.includes('CORS')) {
-                    throw new Error('Lỗi CORS policy. Vui lòng refresh trang và thử lại.');
-                }
-                throw networkError;
-            }
-            setModuleState(prev => ({ ...prev, quick: { ...prev.quick, rewrittenText: result.text || '', isEditing: false, editLoadingMessage: 'Tinh chỉnh hoàn tất!', hasBeenEdited: true } }));
-        } catch (e) {
-            updateStateInput({ editError: `Lỗi tinh chỉnh: ${(e as Error).message}`, isEditing: false, editLoadingMessage: 'Lỗi!' });
-        } finally {
-             // Không xóa editLoadingMessage bằng setTimeout nữa
-             updateStateInput({ editLoadingMessage: null });
-             setIsProcessing(false);
-        }
-    };
+    // REMOVED handlePostRewriteEdit function entirely
     
     const copyToClipboard = (text: string) => {
         if (!text) return;
@@ -578,7 +291,7 @@ ${rewrittenText}
                          <textarea value={rewrittenText} readOnly rows={10} className="w-full p-3 border-2 border-gray-200 rounded-md bg-white"/>
                          <div className="mt-3 flex gap-2">
                             <button onClick={() => copyToClipboard(rewrittenText)} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Sao chép</button>
-                            <button onClick={handlePostRewriteEdit} className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">Biên Tập & Tinh Chỉnh</button>
+                            {/* REMOVED post-edit button */}
                          </div>
                      </div>
                 )}

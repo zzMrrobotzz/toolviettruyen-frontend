@@ -42,6 +42,9 @@ export type ApiProvider = "gemini" | "openai" | "grok" | "deepseek" | "minimax";
 
 export interface ApiSettings {
   provider: ApiProvider;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
   // apiKey removed - now managed by backend
   apiBase: string;
 }
