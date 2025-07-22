@@ -26,7 +26,7 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
     // Lấy state từ moduleState.quick
     const {
         rewriteLevel, sourceLanguage, targetLanguage, rewriteStyle, customRewriteStyle, adaptContext,
-        originalText, rewrittenText, error, progress, loadingMessage,
+        originalText, rewrittenText, error, progress, loadingMessage, isProcessing,
         isEditing, editError, editLoadingMessage, hasBeenEdited, translation
     } = moduleState.quick;
 
@@ -56,7 +56,6 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetLanguage, sourceLanguage]);
 
-    const [isProcessing, setIsProcessing] = React.useState(false);
     const abortControllerRef = useRef<AbortController | null>(null);
     
     // State for Character Map tracking - REMOVED FOR SIMPLICITY
@@ -75,12 +74,11 @@ const RewriteModule: React.FC<RewriteModuleProps> = ({ apiSettings, moduleState,
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
 
-        setIsProcessing(true);
+        updateStateInput({ isProcessing: true });
         // Trừ credit trước khi xử lý
         const hasCredits = await consumeCredit(1);
         if (!hasCredits) {
-            updateStateInput({ error: 'Không đủ credit để thực hiện thao tác này!' });
-            setIsProcessing(false);
+            updateStateInput({ error: 'Không đủ credit để thực hiện thao tác này!', isProcessing: false });
             return;
         }
         // Chỉ reset rewrittenText ở đây
@@ -203,13 +201,12 @@ Chỉ cung cấp văn bản đã viết lại cho đoạn hiện tại bằng ng
             }
         } catch (e) {
             if ((e as Error).name === 'AbortError') {
-                updateStateInput({ error: 'Quá trình viết lại đã bị dừng bởi người dùng.', loadingMessage: 'Đã dừng', progress: 0 });
+                updateStateInput({ error: 'Quá trình viết lại đã bị dừng bởi người dùng.', loadingMessage: 'Đã dừng', progress: 0, isProcessing: false });
             } else {
-                updateStateInput({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0 });
+                updateStateInput({ error: `Lỗi viết lại: ${(e as Error).message}`, loadingMessage: 'Lỗi!', progress: 0, isProcessing: false });
             }
         } finally {
-            updateStateInput({ loadingMessage: null });
-            setIsProcessing(false);
+            updateStateInput({ loadingMessage: null, isProcessing: false });
             abortControllerRef.current = null;
         }
     };

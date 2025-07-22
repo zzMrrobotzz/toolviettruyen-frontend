@@ -153,6 +153,7 @@ const App: React.FC = () => {
       error: null,
       progress: 0,
       loadingMessage: null,
+      isProcessing: false,
       isEditing: false,
       editError: null,
       editLoadingMessage: null,
