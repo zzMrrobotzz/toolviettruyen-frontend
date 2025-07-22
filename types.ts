@@ -247,7 +247,7 @@ export interface QuickRewriteState {
   error: string | null;
   progress: number;
   loadingMessage: string | null;
-  isProcessing?: boolean;
+  isProcessing: boolean;
   isEditing: boolean;
   editError: string | null;
   editLoadingMessage: string | null;
@@ -259,9 +259,29 @@ export interface QuickRewriteState {
   };
 }
 
+export type RewriteActiveTab = 'quick' | 'restructure';
+export type RewriteGoal = 'changeStyle' | 'changePerspective' | 'summarize' | 'expand' | 'changeGenre';
+
+export interface RestructureRewriteState {
+    step: 'planning' | 'reviewing' | 'completed';
+    originalText: string;
+    goal: RewriteGoal;
+    perspectiveCharacter: string;
+    targetGenre: string;
+    customTargetGenre: string;
+    targetStyle: string;
+    customTargetStyle: string;
+    rewritePlan: string;
+    rewrittenText: string;
+    isLoading: boolean;
+    loadingMessage: string | null;
+    error: string | null;
+}
+
 export interface RewriteModuleState {
-  // Quick rewrite tab state
+  activeTab: RewriteActiveTab;
   quick: QuickRewriteState;
+  restructure: RestructureRewriteState;
 }
 
 

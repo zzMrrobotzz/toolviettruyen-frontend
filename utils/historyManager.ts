@@ -6,7 +6,7 @@ export interface HistoryItem {
   timestamp: number;
   title: string; // Auto-generated from first 50 chars
   content: string; // Generated result content
-  module: 'rewrite' | 'batch-rewrite' | 'write-story' | 'batch-story';
+  module: 'rewrite' | 'batch-rewrite' | 'write-story' | 'batch-story' | 'rewrite-quick' | 'rewrite-restructure';
   metadata?: {
     originalText?: string;
     settings?: any;
@@ -28,7 +28,9 @@ export const getHistoryData = (): Record<ModuleType, HistoryItem[]> => {
         'rewrite': [],
         'batch-rewrite': [],
         'write-story': [],
-        'batch-story': []
+        'batch-story': [],
+        'rewrite-quick': [],
+        'rewrite-restructure': []
       };
     }
     return JSON.parse(stored);
@@ -38,7 +40,9 @@ export const getHistoryData = (): Record<ModuleType, HistoryItem[]> => {
       'rewrite': [],
       'batch-rewrite': [],
       'write-story': [],
-      'batch-story': []
+      'batch-story': [],
+      'rewrite-quick': [],
+      'rewrite-restructure': []
     };
   }
 };
@@ -131,6 +135,8 @@ export const downloadHistoryItem = (item: HistoryItem): void => {
   const timestamp = new Date(item.timestamp).toLocaleString('vi-VN');
   const moduleNames = {
     'rewrite': 'Viết Lại',
+    'rewrite-quick': 'Viết Lại Nhanh',
+    'rewrite-restructure': 'Tái Cấu Trúc',
     'batch-rewrite': 'Viết Lại Hàng Loạt', 
     'write-story': 'Viết Truyện',
     'batch-story': 'Viết Truyện Hàng Loạt'
@@ -171,6 +177,8 @@ export const downloadModuleHistory = (module: ModuleType): void => {
 
   const moduleNames = {
     'rewrite': 'Viết Lại',
+    'rewrite-quick': 'Viết Lại Nhanh',
+    'rewrite-restructure': 'Tái Cấu Trúc',
     'batch-rewrite': 'Viết Lại Hàng Loạt',
     'write-story': 'Viết Truyện', 
     'batch-story': 'Viết Truyện Hàng Loạt'
