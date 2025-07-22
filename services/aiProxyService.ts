@@ -69,7 +69,7 @@ export const generateTextViaBackend = async (
 ): Promise<AIResponse> => {
   return retryWithBackoffAndFallback(async (apiUrl: string) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
 
     try {
       const response = await fetch(`${apiUrl}/ai/generate`, {
