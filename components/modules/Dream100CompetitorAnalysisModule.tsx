@@ -3,23 +3,25 @@ import React from 'react';
 import {
     Dream100CompetitorAnalysisModuleState,
     Dream100ChannelResult,
-    GroundingChunk
+    GroundingChunk,
+    ApiSettings
 } from '../../types';
 import { HOOK_LANGUAGE_OPTIONS } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 import { useAppContext } from '../../AppContext';
 
 interface Dream100CompetitorAnalysisModuleProps {
+  apiSettings: ApiSettings;
   moduleState: Dream100CompetitorAnalysisModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<Dream100CompetitorAnalysisModuleState>>;
 }
 
 const Dream100CompetitorAnalysisModule: React.FC<Dream100CompetitorAnalysisModuleProps> = ({
-    moduleState, setModuleState
+    apiSettings, moduleState, setModuleState
 }) => {
   const { consumeCredit } = useAppContext(); // Use context
   const {
@@ -107,8 +109,21 @@ If you cannot find enough distinct similar channels, return as many as you can u
     `;
 
     try {
-      const result = await generateText(prompt, undefined, true, apiSettings?.apiKey); // Enable Google Search
-      const parsedResults = await generateTextWithJsonOutput<Dream100ChannelResult[]>(prompt, undefined, apiSettings?.apiKey);
+      const request = {
+        prompt,
+        provider: apiSettings?.provider || 'gemini',
+        model: apiSettings?.model,
+        temperature: apiSettings?.temperature,
+        maxTokens: apiSettings?.maxTokens,
+        useSearch: true
+      };
+
+      const result = await generateTextViaBackend(request);
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
+      const parsedResults = JSON.parse(result.text || '[]') as Dream100ChannelResult[];
       
       updateState({
         analysisResults: parsedResults,

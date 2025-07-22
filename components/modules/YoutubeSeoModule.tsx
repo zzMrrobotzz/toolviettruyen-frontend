@@ -14,7 +14,6 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText as generateTextDirect, generateTextWithJsonOutput as generateTextWithJsonOutputDirect } from '../../services/geminiService';
 import { generateTextViaBackend } from '../../services/aiProxyService';
 
 interface YoutubeSeoModuleProps {
@@ -24,11 +23,48 @@ interface YoutubeSeoModuleProps {
 }
 
 const generateText = async (prompt: string, systemInstruction?: string, useJsonOutput?: boolean, apiSettings?: ApiSettings) => {
-  return await generateTextDirect(prompt, systemInstruction, false, apiSettings?.apiKey);
+  const request = {
+    prompt,
+    provider: apiSettings?.provider || 'gemini',
+    model: apiSettings?.model,
+    temperature: apiSettings?.temperature,
+    maxTokens: apiSettings?.maxTokens,
+  };
+
+  const result = await generateTextViaBackend(request, (newCredit) => {
+    // Update credit if needed
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'AI generation failed');
+  }
+
+  return { text: result.text || '' };
 };
 
 const generateTextWithJsonOutput = async <T,>(prompt: string, systemInstruction?: string, apiSettings?: ApiSettings): Promise<T> => {
-  return await generateTextWithJsonOutputDirect<T>(prompt, systemInstruction, apiSettings?.apiKey);
+  const request = {
+    prompt,
+    provider: apiSettings?.provider || 'gemini',
+    model: apiSettings?.model,
+    temperature: apiSettings?.temperature,
+    maxTokens: apiSettings?.maxTokens,
+  };
+
+  const result = await generateTextViaBackend(request, (newCredit) => {
+    // Update credit if needed
+  });
+
+  if (!result.success) {
+    throw new Error(result.error || 'AI generation failed');
+  }
+
+  // Try to parse as JSON
+  try {
+    return JSON.parse(result.text || '{}');
+  } catch (e) {
+    throw new Error('Failed to parse JSON response');
+  }
 };
 
 const YoutubeSeoModule: React.FC<YoutubeSeoModuleProps> = ({ apiSettings, moduleState, setModuleState }) => {

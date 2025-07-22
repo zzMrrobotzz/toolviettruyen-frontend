@@ -660,6 +660,7 @@ const App: React.FC = () => {
                 />;
        case ActiveModule.Dream100CompetitorAnalysis:
         return <Dream100CompetitorAnalysisModule
+                  apiSettings={apiSettings}
                   moduleState={dream100State}
                   setModuleState={setDream100State}
                 />;

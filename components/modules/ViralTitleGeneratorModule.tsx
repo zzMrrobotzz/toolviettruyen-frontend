@@ -7,7 +7,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText, generateTextWithJsonOutput } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 
 interface ContentStrategyModuleProps {
   apiSettings: ApiSettings;
@@ -111,8 +111,20 @@ ${creationViralContext.trim()}
       }
 
       if (prompt) {
-        const result = await generateText(prompt, undefined, false, apiSettings?.apiKey);
-        let mainResultText = result.text;
+        const request = {
+          prompt,
+          provider: apiSettings?.provider || 'gemini',
+          model: apiSettings?.model,
+          temperature: apiSettings?.temperature,
+          maxTokens: apiSettings?.maxTokens,
+        };
+
+        const result = await generateTextViaBackend(request);
+        if (!result.success) {
+          throw new Error(result.error || 'AI generation failed');
+        }
+
+        let mainResultText = result.text || '';
         let explanationText = null;
 
         if (creationSourceType === 'baseTitle') {
@@ -203,8 +215,21 @@ Gợi ý 2: ...
 `;
 
     try {
-        const result = await generateText(prompt, undefined, analyzeInputType === 'urls', apiSettings?.apiKey);
-        const text = result.text;
+        const request = {
+          prompt,
+          provider: apiSettings?.provider || 'gemini',
+          model: apiSettings?.model,
+          temperature: apiSettings?.temperature,
+          maxTokens: apiSettings?.maxTokens,
+          useSearch: analyzeInputType === 'urls'
+        };
+
+        const result = await generateTextViaBackend(request);
+        if (!result.success) {
+          throw new Error(result.error || 'AI generation failed');
+        }
+
+        const text = result.text || '';
         const groundingChunks = result.groundingChunks || [];
 
         const reportMatch = text.match(/\[ANALYSIS_REPORT_START\]([\s\S]*?)\[\/ANALYSIS_REPORT_END\]/);
@@ -278,7 +303,20 @@ Ensure the output is ONLY the JSON array. Do not include any introductory text, 
     `;
 
     try {
-      const resultsArray = await generateTextWithJsonOutput<NicheThemeAnalysisResult[]>(prompt, undefined, apiSettings?.apiKey);
+      const request = {
+        prompt,
+        provider: apiSettings?.provider || 'gemini',
+        model: apiSettings?.model,
+        temperature: apiSettings?.temperature,
+        maxTokens: apiSettings?.maxTokens,
+      };
+
+      const result = await generateTextViaBackend(request);
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
+      const resultsArray = JSON.parse(result.text || '[]') as NicheThemeAnalysisResult[];
       if (Array.isArray(resultsArray)) {
         updateState({ 
             nicheAnalysisResults: resultsArray, 

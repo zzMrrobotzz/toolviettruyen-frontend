@@ -3,24 +3,25 @@ import {
     ImageGenerationSuiteModuleState, 
     GeneratedImageItem,
     ImageGenerationSuiteActiveTab,
+    ApiSettings
 } from '../../types';
 import { ASPECT_RATIO_OPTIONS, PREDEFINED_ART_STYLES } from '../../constants';
 import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateImage, generateText } from '../../services/geminiService';
-import { generateImageViaBackend } from '../../services/aiProxyService';
+import { generateTextViaBackend, generateImageViaBackend } from '../../services/aiProxyService';
 import { delay } from '../../utils';
 import { useAppContext } from '../../AppContext';
 
 interface ImageGenerationSuiteModuleProps {
+  apiSettings: ApiSettings;
   moduleState: ImageGenerationSuiteModuleState;
   setModuleState: React.Dispatch<React.SetStateAction<ImageGenerationSuiteModuleState>>;
 }
 
 const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
-  moduleState, setModuleState
+  apiSettings, moduleState, setModuleState
 }) => {
   const { consumeCredit } = useAppContext();
   const {
@@ -108,7 +109,20 @@ const ImageGenerationSuiteModule: React.FC<ImageGenerationSuiteModuleProps> = ({
     `;
 
     try {
-      const result = await generateText(subPromptsGenerationPrompt, 'You are an AI assistant that analyzes text and generates multiple detailed image prompts in English, formatted as a JSON array.', false, apiSettings?.apiKey);
+      const request = {
+        prompt: subPromptsGenerationPrompt,
+        provider: apiSettings?.provider || 'gemini',
+        model: apiSettings?.model,
+        temperature: apiSettings?.temperature,
+        maxTokens: apiSettings?.maxTokens,
+        systemMessage: 'You are an AI assistant that analyzes text and generates multiple detailed image prompts in English, formatted as a JSON array.'
+      };
+
+      const result = await generateTextViaBackend(request);
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
       const jsonResponse = JSON.parse(result.text || '{}');
       if (!jsonResponse.image_prompts || !Array.isArray(jsonResponse.image_prompts)) {
         throw new Error('Invalid response format');

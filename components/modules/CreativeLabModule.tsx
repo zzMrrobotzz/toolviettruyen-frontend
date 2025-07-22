@@ -6,7 +6,7 @@ import ModuleContainer from '../ModuleContainer';
 import LoadingSpinner from '../LoadingSpinner';
 import ErrorAlert from '../ErrorAlert';
 import InfoBox from '../InfoBox';
-import { generateText } from '../../services/geminiService';
+import { generateTextViaBackend } from '../../services/aiProxyService';
 
 interface CreativeLabModuleProps {
   apiSettings: ApiSettings;
@@ -73,9 +73,21 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     Chỉ trả về nội dung phân tích, không thêm lời chào hay giới thiệu.`;
 
     try {
-      const result = await generateText(prompt, undefined, false, apiSettings?.apiKey);
+      const request = {
+        prompt,
+        provider: apiSettings?.provider || 'gemini',
+        model: apiSettings?.model,
+        temperature: apiSettings?.temperature,
+        maxTokens: apiSettings?.maxTokens,
+      };
+
+      const result = await generateTextViaBackend(request);
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
       updateState({ 
-        referenceOutlineAnalysisResult: result.text, 
+        referenceOutlineAnalysisResult: result.text || '', 
         isAnalyzingReferenceOutline: false 
       });
     } catch (e) {
@@ -124,8 +136,20 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     -   Toàn bộ dàn ý cuối cùng phải được viết bằng ngôn ngữ ${selectedOutputLangLabel}. Không thêm bất kỳ lời bình hay giới thiệu nào ngoài dàn ý.`;
 
     try {
-      const result = await generateText(prompt, undefined, false, apiSettings?.apiKey);
-      updateState({ quickOutlineResult: result.text, quickOutlineLoading: false, quickOutlineProgressMessage: 'Hoàn thành!' });
+      const request = {
+        prompt,
+        provider: apiSettings?.provider || 'gemini',
+        model: apiSettings?.model,
+        temperature: apiSettings?.temperature,
+        maxTokens: apiSettings?.maxTokens,
+      };
+
+      const result = await generateTextViaBackend(request);
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
+      updateState({ quickOutlineResult: result.text || '', quickOutlineLoading: false, quickOutlineProgressMessage: 'Hoàn thành!' });
       setTimeout(() => setModuleState(prev => prev.quickOutlineProgressMessage === 'Hoàn thành!' ? {...prev, quickOutlineProgressMessage: null} : prev ), 3000);
     } catch (e) {
       updateState({ quickOutlineError: `Lỗi khi tạo dàn ý nhanh: ${(e as Error).message}`, quickOutlineLoading: false, quickOutlineProgressMessage: null });
@@ -193,8 +217,20 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     `;
 
     try {
-      const result = await generateText(prompt, undefined, false, apiSettings?.apiKey);
-      updateState({ finalOutline: result.text, singleOutlineLoading: false, singleOutlineProgressMessage: 'Hoàn thành!' });
+      const request = {
+        prompt,
+        provider: apiSettings?.provider || 'gemini',
+        model: apiSettings?.model,
+        temperature: apiSettings?.temperature,
+        maxTokens: apiSettings?.maxTokens,
+      };
+
+      const result = await generateTextViaBackend(request);
+      if (!result.success) {
+        throw new Error(result.error || 'AI generation failed');
+      }
+
+      updateState({ finalOutline: result.text || '', singleOutlineLoading: false, singleOutlineProgressMessage: 'Hoàn thành!' });
       setTimeout(() => setModuleState(prev => prev.singleOutlineProgressMessage === 'Hoàn thành!' ? {...prev, singleOutlineProgressMessage: null} : prev ), 3000);
     } catch (e) {
       updateState({ singleOutlineError: `Lỗi khi tạo dàn ý chuyên sâu: ${(e as Error).message}`, singleOutlineLoading: false, singleOutlineProgressMessage: null });
@@ -287,8 +323,20 @@ const CreativeLabModule: React.FC<CreativeLabModuleProps> = ({
     -   Đảm bảo dàn ý logic, hấp dẫn.
     -   Toàn bộ dàn ý cuối cùng phải được viết bằng ngôn ngữ ${selectedOutputLangLabel}. Không thêm bất kỳ lời bình hay giới thiệu nào ngoài dàn ý.
     `;
-    const result = await generateText(prompt, undefined, false, apiSettings?.apiKey);
-    return result.text;
+    const request = {
+      prompt,
+      provider: apiSettings?.provider || 'gemini',
+      model: apiSettings?.model,
+      temperature: apiSettings?.temperature,
+      maxTokens: apiSettings?.maxTokens,
+    };
+
+    const result = await generateTextViaBackend(request);
+    if (!result.success) {
+      throw new Error(result.error || 'AI generation failed');
+    }
+
+    return result.text || '';
   };
 
 
